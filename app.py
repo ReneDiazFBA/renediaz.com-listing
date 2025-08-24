@@ -48,8 +48,8 @@ if seleccion == "Datos":
     mostrar_carga_excel()
 
 elif seleccion == "Keywords":
-    st.title("Módulo: Keywords")
-    st.info("Aquí se mostrarán las tablas de origen. [Placeholder]")
+    from keywords.app_keywords_data import mostrar_keywords_data
+    mostrar_keywords_data()
 
 elif seleccion == "Mercado":
     st.title("Módulo: Mercado")
