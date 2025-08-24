@@ -61,3 +61,12 @@ def mostrar_carga_excel():
                         filepath, arcname=os.path.relpath(filepath, "."))
 
         st.success(f"Backup creado: {backup_path}")
+
+        # Botón para descargar
+        with open(backup_path, "rb") as f:
+            st.download_button(
+                label="Descargar backup",
+                data=f,
+                file_name=backup_filename,
+                mime="application/zip"
+            )
