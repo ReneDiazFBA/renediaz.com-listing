@@ -1,5 +1,5 @@
 # keywords/app_keywords_referencial.py
-# Reverse ASIN Referencial (CustKW)
+# Reverse ASIN Referencial (CustKW) — con filtros
 
 import os
 import pandas as pd
@@ -27,7 +27,7 @@ def _obtener_excel(excel_data: Optional[pd.ExcelFile]) -> Optional[pd.ExcelFile]
 
 def _trunc_two_decimals(x: float) -> str:
     try:
-        v = int(float(x) * 10000) / 100  # truncado
+        v = int(float(x) * 10000) / 100
         return f"{v:.2f}%"
     except Exception:
         return "—"
@@ -43,6 +43,7 @@ def mostrar_tabla_referencial(excel_data: Optional[pd.ExcelFile] = None, sheet_n
         df = base.iloc[2:, [0, 15, 1, 14]].copy()
         df.columns = ["Search Terms", "Search Volume",
                       "ASIN Click Share", "ABA Rank"]
+        df_total = df.copy()
     except Exception as e:
         st.error(f"No se pudo leer la hoja '{sheet_name}': {e}")
         return
@@ -52,15 +53,40 @@ def mostrar_tabla_referencial(excel_data: Optional[pd.ExcelFile] = None, sheet_n
     for c in ["Search Volume", "ABA Rank", "ASIN Click Share"]:
         df[c] = pd.to_numeric(df[c], errors="coerce")
 
-    df["ASIN Click Share"] = df["ASIN Click Share"].map(
-        lambda x: _trunc_two_decimals(x) if pd.notna(x) else "—")
-    df["Search Volume"] = df["Search Volume"].map(
-        lambda x: f"{int(x):,}" if pd.notna(x) else "—")
-    df["ABA Rank"] = df["ABA Rank"].map(
-        lambda x: f"{int(x):,}" if pd.notna(x) else "—")
+    col1, col2 = st.columns(2)
+    with col1:
+        vol_min_input = st.text_input(
+            "Search Volume mínimo", placeholder="Ej: 5000", key="vol_min_ref")
+    with col2:
+        share_min_input = st.text_input(
+            "Click Share mínimo (%)", placeholder="Ej: 5", key="click_min_ref")
 
-    df = df[["Search Terms", "Search Volume", "ASIN Click Share", "ABA Rank"]]
+    vol_min_aplicado = vol_min_input.strip().isdigit()
+    share_min_aplicado = share_min_input.strip().replace(".", "", 1).isdigit()
+
+    vol_min = int(vol_min_input) if vol_min_aplicado else None
+    share_min = float(share_min_input) if share_min_aplicado else None
+
+    df_filtrado = df.copy()
+    if vol_min is not None:
+        df_filtrado = df_filtrado[df_filtrado["Search Volume"] >= vol_min]
+    if share_min is not None:
+        df_filtrado = df_filtrado[df_filtrado["ASIN Click Share"] >= (
+            share_min / 100)]
 
     st.markdown("#### Reverse ASIN Listing")
-    st.markdown(f"**Total Registros:** {len(df)}")
-    st.dataframe(df, use_container_width=True)
+    st.markdown(f"**Total Registros:** {len(df_filtrado)}")
+
+    df_filtrado["ASIN Click Share"] = df_filtrado["ASIN Click Share"].map(
+        lambda x: _trunc_two_decimals(x) if pd.notna(x) else "—"
+    )
+    df_filtrado["Search Volume"] = df_filtrado["Search Volume"].map(
+        lambda x: f"{int(x):,}" if pd.notna(x) else "—"
+    )
+    df_filtrado["ABA Rank"] = df_filtrado["ABA Rank"].map(
+        lambda x: f"{int(x):,}" if pd.notna(x) else "—"
+    )
+
+    df_filtrado = df_filtrado[["Search Terms",
+                               "Search Volume", "ASIN Click Share", "ABA Rank"]]
+    st.dataframe(df_filtrado, use_container_width=True)
