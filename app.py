@@ -5,19 +5,19 @@ from streamlit_option_menu import option_menu
 
 st.set_page_config(page_title="ReneDiaz.com Listing", layout="wide")
 
-# Menú lateral funcional sin íconos
+# 1. Menú lateral — sin íconos, sin submenús rotos
 with st.sidebar:
     st.markdown("## Navegación")
 
-    seleccion = option_menu(
+    seccion_principal = option_menu(
         menu_title=None,
         options=[
             "Datos",
-            {"label": "Keywords", "submenu": ["Tablas de origen"]},
+            "Keywords",
             "Mercado",
             "Listing"
         ],
-        icons=[None] * 4,  # No usar íconos (rompen los submenús)
+        icons=[None] * 4,
         default_index=0,
         orientation="vertical",
         styles={
@@ -35,19 +35,26 @@ with st.sidebar:
         }
     )
 
-# Vista según sección seleccionada
-if seleccion == "Datos":
+# 2. Navegación lógica — hijo simulado
+if seccion_principal == "Datos":
     from datos.app_datos_upload import mostrar_carga_excel
     mostrar_carga_excel()
 
-elif seleccion == "Tablas de origen":
-    from keywords.app_keywords_data import mostrar_keywords_data
-    mostrar_keywords_data()
+elif seccion_principal == "Keywords":
+    submodulo = st.radio(
+        "Selecciona submódulo de Keywords:",
+        ["Tablas de origen"],
+        horizontal=True
+    )
 
-elif seleccion == "Mercado":
+    if submodulo == "Tablas de origen":
+        from keywords.app_keywords_data import mostrar_keywords_data
+        mostrar_keywords_data()
+
+elif seccion_principal == "Mercado":
     st.title("Módulo: Mercado")
     st.info("Aquí irá el análisis de reviews. [Placeholder]")
 
-elif seleccion == "Listing":
+elif seccion_principal == "Listing":
     st.title("Módulo: Listing")
     st.info("Aquí se construirá el listing final. [Placeholder]")
