@@ -1,5 +1,7 @@
 # reemplazo en keywords/app_keywords_data.py
 
+import pandas as pd
+
 from keywords.app_keywords_referencial import mostrar_tabla_referencial
 from keywords.app_keywords_competidores import mostrar_tabla_competidores
 from typing import Optional
