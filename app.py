@@ -13,7 +13,7 @@ with st.sidebar:
         menu_title=None,
         options=[
             "Datos",
-            "Keywords",
+            {"label": "Keywords", "submenu": ["Tablas de origen"]},
             "Mercado",
             "Listing"
         ],
@@ -47,7 +47,7 @@ if seleccion == "Datos":
     from datos.app_datos_upload import mostrar_carga_excel
     mostrar_carga_excel()
 
-elif seleccion == "Keywords":
+elif seleccion == "Tablas de origen":
     from keywords.app_keywords_data import mostrar_keywords_data
     mostrar_keywords_data()
 
