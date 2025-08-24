@@ -5,7 +5,7 @@ from streamlit_option_menu import option_menu
 
 st.set_page_config(page_title="ReneDiaz.com Listing", layout="wide")
 
-# Menú lateral personalizado
+# Menú lateral funcional sin íconos
 with st.sidebar:
     st.markdown("## Navegación")
 
@@ -17,18 +17,11 @@ with st.sidebar:
             "Mercado",
             "Listing"
         ],
-        icons=[
-            "cloud-upload",      # Datos
-            "search",            # Keywords
-            "bar-chart",         # Mercado
-            "file-earmark-text"  # Listing
-        ],
-        menu_icon="cast",
+        icons=[None] * 4,  # No usar íconos (rompen los submenús)
         default_index=0,
         orientation="vertical",
         styles={
             "container": {"padding": "0!important", "background-color": "#f2f2f2"},
-            "icon": {"color": "#0071bc", "font-size": "18px"},
             "nav-link": {
                 "font-size": "18px",
                 "text-align": "left",
