@@ -1,18 +1,25 @@
 # utils/nav_utils.py
-# Componente visual reutilizable para navegación tipo header (cascarón visual puro)
+# Subnavegación funcional con st.radio (reutilizable en cualquier módulo)
 
 import streamlit as st
 
 
-def render_subnav_cascaron(active: str, secciones: dict):
+def render_subnav(active: str, secciones: dict) -> str:
     """
-    Renderiza navegación horizontal tipo header (visual puro, sin lógica).
+    Subnavegación funcional con st.radio.
+    Recibe el activo actual y el diccionario de secciones.
+    Devuelve la clave seleccionada.
     """
-    cols = st.columns(len(secciones))
-    for i, (key, (label, _)) in enumerate(secciones.items()):
-        if key == active:
-            style = "color: #f7931e; font-weight: bold; border-bottom: 3px solid #f7931e;"
-        else:
-            style = "color: #0071bc; font-weight: normal;"
-        cols[i].markdown(
-            f"<div style='{style}'>{label}</div>", unsafe_allow_html=True)
+    label_map = {v[0]: k for k, v in secciones.items()}
+    opciones = list(label_map.keys())
+    idx = opciones.index(secciones[active][0]) if active in secciones else 0
+
+    seleccion = st.radio(
+        label="",
+        options=opciones,
+        index=idx,
+        horizontal=True,
+        label_visibility="collapsed"
+    )
+
+    return label_map[seleccion]
