@@ -2,6 +2,7 @@
 
 from keywords.app_keywords_referencial import mostrar_tabla_referencial
 from keywords.app_keywords_competidores import mostrar_tabla_competidores
+from typing import Optional
 
 
 def mostrar_keywords_data(excel_data: Optional[pd.ExcelFile] = None):
