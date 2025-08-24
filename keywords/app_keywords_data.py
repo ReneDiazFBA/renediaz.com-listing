@@ -6,7 +6,7 @@ from typing import Optional
 
 from keywords.app_keywords_referencial import mostrar_tabla_referencial
 from keywords.app_keywords_competidores import mostrar_tabla_competidores
-from utils.nav_utils import render_subnav_cascaron as render_subnav
+from utils.nav_utils import render_subnav
 
 
 def mostrar_keywords_data(excel_data: Optional[pd.ExcelFile] = None):
