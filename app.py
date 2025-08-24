@@ -41,16 +41,19 @@ with st.sidebar:
         }
     )
 
-# Renderizado condicional según selección
+# Vista según sección seleccionada
 if seleccion == "Datos":
-    st.title("Sección: Datos")
-    st.info("Aquí irá la carga del Excel.")
+    st.title("📂 Módulo: Datos")
+    st.info("Aquí va la carga del archivo Excel. [Placeholder]")
+
 elif seleccion == "Keywords":
-    st.title("Sección: Keywords")
-    st.info("Aquí irán las tablas de origen (Referencial, Competidores, Mining).")
+    st.title("🔑 Módulo: Keywords")
+    st.info("Aquí se mostrarán las tablas de origen. [Placeholder]")
+
 elif seleccion == "Mercado":
-    st.title("Sección: Mercado")
-    st.info("Aquí irá el análisis de reviews.")
+    st.title("📊 Módulo: Mercado")
+    st.info("Aquí irá el análisis de reviews. [Placeholder]")
+
 elif seleccion == "Listing":
-    st.title("Sección: Listing")
-    st.info("Aquí irá el generador del listing final.")
+    st.title("📝 Módulo: Listing")
+    st.info("Aquí se construirá el listing final. [Placeholder]")
