@@ -21,15 +21,9 @@ def mostrar_keywords_data(excel_data: Optional[pd.ExcelFile] = None):
 
     active = render_subnav("referencial", secciones)
     st.divider()
-
     if active == "referencial":
-        st.write("✅ Debug: cargando tabla referencial...")
-        mostrar_tabla_referencial(excel_data, sheet_name="CustKW")
-
+        mostrar_tabla_referencial(excel_data, secciones[active][1])
     elif active == "competidores":
-        st.write("✅ Debug: cargando tabla competidores...")
-        mostrar_tabla_competidores(excel_data, sheet_name="CompKW")
-
+        mostrar_tabla_competidores(excel_data, secciones[active][1])
     elif active == "mining":
-        st.write("✅ Debug: cargando tabla mining...")
-        mostrar_tabla_mining(excel_data, sheet_name="MiningKW")
+        mostrar_tabla_mining(excel_data, secciones[active][1])
