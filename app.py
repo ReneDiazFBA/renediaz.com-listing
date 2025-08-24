@@ -1,4 +1,5 @@
 # app.py
+
 import streamlit as st
 from streamlit_option_menu import option_menu
 
@@ -17,9 +18,9 @@ with st.sidebar:
             "Listing"
         ],
         icons=[
-            "cloud-upload",  # Datos
-            "search",        # Keywords
-            "bar-chart",     # Mercado
+            "cloud-upload",      # Datos
+            "search",            # Keywords
+            "bar-chart",         # Mercado
             "file-earmark-text"  # Listing
         ],
         menu_icon="cast",
