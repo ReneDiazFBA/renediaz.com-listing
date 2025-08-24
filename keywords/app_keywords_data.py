@@ -1,10 +1,12 @@
-# reemplazo en keywords/app_keywords_data.py
+# keywords/app_keywords_data.py
 
+import streamlit as st
 import pandas as pd
+from typing import Optional
 
 from keywords.app_keywords_referencial import mostrar_tabla_referencial
 from keywords.app_keywords_competidores import mostrar_tabla_competidores
-from typing import Optional
+from utils.nav_utils import render_subnav_cascaron as render_subnav
 
 
 def mostrar_keywords_data(excel_data: Optional[pd.ExcelFile] = None):
@@ -19,7 +21,6 @@ def mostrar_keywords_data(excel_data: Optional[pd.ExcelFile] = None):
     qp = st.query_params
     active = qp.get("subview", ["referencial"])[0]
 
-    from utils.nav_utils import render_subnav_cascaron as render_subnav
     render_subnav(active, secciones)
     st.divider()
 
