@@ -82,7 +82,7 @@ def mostrar_tabla_competidores(excel_data: Optional[pd.ExcelFile] = None, sheet_
         df_filtrado = df_filtrado[df_filtrado["Comp Depth"] >= depth_min]
 
     st.markdown("#### Reverse ASIN Competidores")
-    st.markdown(f"**Total Registros:** {len(df_filtrado)}")
+    st.markdown(f"**Total Registros:** {len(df_filtrado)} of {len(df_total)}")
 
     df_filtrado["Comp Click Share"] = df_filtrado["Comp Click Share"].map(
         lambda x: _trunc_two_decimals(x) if pd.notna(x) else "—"

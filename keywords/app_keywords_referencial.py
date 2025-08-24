@@ -75,7 +75,7 @@ def mostrar_tabla_referencial(excel_data: Optional[pd.ExcelFile] = None, sheet_n
             share_min / 100)]
 
     st.markdown("#### Reverse ASIN Listing")
-    st.markdown(f"**Total Registros:** {len(df_filtrado)}")
+    st.markdown(f"**Total Registros:** {len(df_filtrado)} of {len(df_total)}")
 
     df_filtrado["ASIN Click Share"] = df_filtrado["ASIN Click Share"].map(
         lambda x: _trunc_two_decimals(x) if pd.notna(x) else "—"

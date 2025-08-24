@@ -88,7 +88,7 @@ def mostrar_tabla_mining(excel_data: Optional[pd.ExcelFile] = None, sheet_name: 
         df_filtrado = df_filtrado[df_filtrado["Niche Depth"] >= depth_min]
 
     st.markdown("#### Mining de Keywords")
-    st.markdown(f"**Total Registros:** {len(df_filtrado)}")
+    st.markdown(f"**Total Registros:** {len(df_filtrado)} of {len(df_total)}")
 
     df_filtrado["Niche Click Share"] = df_filtrado["Niche Click Share"].map(
         lambda x: _trunc_two_decimals(x) if pd.notna(x) else "—"
