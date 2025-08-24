@@ -1,5 +1,5 @@
 # keywords/app_keywords_mining.py
-# Mining de Keywords (MiningKW) — con filtros: volumen, relevancia, niche depth
+# Mining de Keywords (MiningKW) — con filtros alineados en una fila
 
 import os
 import pandas as pd
@@ -53,7 +53,7 @@ def mostrar_tabla_mining(excel_data: Optional[pd.ExcelFile] = None, sheet_name: 
     for c in ["Search Volume", "Niche Click Share", "Niche Depth", "Relevancy"]:
         df[c] = pd.to_numeric(df[c], errors="coerce")
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         vol_min_input = st.text_input(
             "Search Volume mínimo", placeholder="Ej: 5000", key="vol_min_mining")
@@ -63,8 +63,6 @@ def mostrar_tabla_mining(excel_data: Optional[pd.ExcelFile] = None, sheet_name: 
     with col3:
         relevancia_min_input = st.text_input(
             "Relevancia mínima (%)", placeholder="Ej: 40", key="rel_min_mining")
-
-    col4 = st.columns(1)[0]
     with col4:
         depth_min_input = st.text_input(
             "Niche Depth mínimo", placeholder="Ej: 500", key="depth_min_mining")
