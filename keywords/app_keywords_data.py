@@ -1,18 +1,11 @@
-# keywords/app_keywords_data.py
-# Contenedor principal de navegación entre vistas de keywords
+# reemplazo en keywords/app_keywords_data.py
 
-import streamlit as st
-import pandas as pd
-from typing import Optional
-from utils.nav_utils import render_subnav_cascaron as render_subnav
+from keywords.app_keywords_referencial import mostrar_tabla_referencial
+from keywords.app_keywords_competidores import mostrar_tabla_competidores
 
 
 def mostrar_keywords_data(excel_data: Optional[pd.ExcelFile] = None):
-    """
-    Contenedor principal de 'Tablas de origen' con navegación tipo header simplificada.
-    """
     st.markdown("### Keywords — Tablas de origen")
-    st.caption("Este módulo aloja las vistas de Reverse ASIN Referencial, Competidores y Mining. Navega por el menú superior.")
 
     secciones = {
         "referencial": ("Reverse ASIN Referencial", "CustKW"),
@@ -23,15 +16,13 @@ def mostrar_keywords_data(excel_data: Optional[pd.ExcelFile] = None):
     qp = st.query_params
     active = qp.get("subview", ["referencial"])[0]
 
+    from utils.nav_utils import render_subnav_cascaron as render_subnav
     render_subnav(active, secciones)
     st.divider()
 
-    label_visible, sheet_name = secciones.get(active, ("Vista no definida", "CustKW"))
-
     if active == "referencial":
-        from keywords.app_keywords_referencial import mostrar_tabla_referencial
-        mostrar_tabla_referencial(excel_data, sheet_name)
+        mostrar_tabla_referencial(excel_data, sheet_name="CustKW")
     elif active == "competidores":
-        st.info("Reverse ASIN Competidores [pendiente]")
-    elif active == "mining":
-        st.info("Mining de Keywords [pendiente]")
+        mostrar_tabla_competidores(excel_data, sheet_name="CompKW")
+    else:
+        st.info("Mining aún no implementado.")
