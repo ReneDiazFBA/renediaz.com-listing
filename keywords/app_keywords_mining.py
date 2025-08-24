@@ -1,5 +1,5 @@
 # keywords/app_keywords_mining.py
-# Mining de Keywords (MiningKW) — con filtros
+# Mining de Keywords (MiningKW) — con filtros: volumen, relevancia, niche depth
 
 import os
 import pandas as pd
@@ -50,22 +50,32 @@ def mostrar_tabla_mining(excel_data: Optional[pd.ExcelFile] = None, sheet_name: 
 
     df = df.dropna(subset=["Search Terms"]).reset_index(drop=True)
 
-    for c in ["Search Volume", "Niche Depth", "Niche Click Share", "Relevancy"]:
+    for c in ["Search Volume", "Niche Click Share", "Niche Depth", "Relevancy"]:
         df[c] = pd.to_numeric(df[c], errors="coerce")
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         vol_min_input = st.text_input(
             "Search Volume mínimo", placeholder="Ej: 5000", key="vol_min_mining")
     with col2:
         share_min_input = st.text_input(
             "Click Share mínimo (%)", placeholder="Ej: 5", key="click_min_mining")
+    with col3:
+        relevancia_min_input = st.text_input(
+            "Relevancia mínima (%)", placeholder="Ej: 40", key="rel_min_mining")
 
-    vol_min_aplicado = vol_min_input.strip().isdigit()
-    share_min_aplicado = share_min_input.strip().replace(".", "", 1).isdigit()
+    col4 = st.columns(1)[0]
+    with col4:
+        depth_min_input = st.text_input(
+            "Niche Depth mínimo", placeholder="Ej: 500", key="depth_min_mining")
 
-    vol_min = int(vol_min_input) if vol_min_aplicado else None
-    share_min = float(share_min_input) if share_min_aplicado else None
+    vol_min = int(vol_min_input) if vol_min_input.strip().isdigit() else None
+    share_min = float(share_min_input) if share_min_input.strip().replace(
+        ".", "", 1).isdigit() else None
+    relevancia_min = float(relevancia_min_input) if relevancia_min_input.strip(
+    ).replace(".", "", 1).isdigit() else None
+    depth_min = int(
+        depth_min_input) if depth_min_input.strip().isdigit() else None
 
     df_filtrado = df.copy()
     if vol_min is not None:
@@ -73,6 +83,11 @@ def mostrar_tabla_mining(excel_data: Optional[pd.ExcelFile] = None, sheet_name: 
     if share_min is not None:
         df_filtrado = df_filtrado[df_filtrado["Niche Click Share"] >= (
             share_min / 100)]
+    if relevancia_min is not None:
+        df_filtrado = df_filtrado[df_filtrado["Relevancy"] >= (
+            relevancia_min / 100)]
+    if depth_min is not None:
+        df_filtrado = df_filtrado[df_filtrado["Niche Depth"] >= depth_min]
 
     st.markdown("#### Mining de Keywords")
     st.markdown(f"**Total Registros:** {len(df_filtrado)}")
