@@ -1,5 +1,4 @@
 # utils/nav_utils.py
-# Subnavegación horizontal reutilizable para cualquier módulo
 
 import streamlit as st
 
@@ -20,7 +19,7 @@ def render_subnav(default_key: str, secciones: dict) -> str:
 
     claves = list(secciones.keys())
     labels = [secciones[k][0] for k in claves]
-    label_to_key = {v: k for k, v in secciones.items()}
+    label_to_key = {v[0]: k for k, v in secciones.items()}  # FIX aquí
     default_label = secciones[active][0] if active in claves else labels[0]
 
     selected_label = st.radio(
