@@ -47,13 +47,13 @@ if seleccion == "Datos":
     mostrar_carga_excel()
 
 elif seleccion == "Keywords":
-    st.title("🔑 Módulo: Keywords")
+    st.title("Módulo: Keywords")
     st.info("Aquí se mostrarán las tablas de origen. [Placeholder]")
 
 elif seleccion == "Mercado":
-    st.title("📊 Módulo: Mercado")
+    st.title("Módulo: Mercado")
     st.info("Aquí irá el análisis de reviews. [Placeholder]")
 
 elif seleccion == "Listing":
-    st.title("📝 Módulo: Listing")
+    st.title("Módulo: Listing")
     st.info("Aquí se construirá el listing final. [Placeholder]")
