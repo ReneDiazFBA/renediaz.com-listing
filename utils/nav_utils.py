@@ -1,41 +1,34 @@
 # utils/nav_utils.py
-# Utilidades genéricas de navegación para el dashboard ReneDiaz.com
+# Subnavegación reutilizable para cualquier módulo (Referencial, Competidores, etc.)
 
 import streamlit as st
-from typing import List
 
 
-def render_subnav_radio(key: str, labels: List[str]) -> str:
+def render_subnav(default_key: str, secciones: dict) -> str:
     """
-    Renderiza un submenú horizontal tipo st.radio universal,
-    usando query_params para conservar el estado.
+    Renderiza un submenú horizontal basado en secciones.
 
-    Parámetros:
-    - key: prefijo único del módulo (ej. "keywords", "mercado")
-    - labels: lista de opciones visibles (ej. ["Tablas de origen", "Resumen"])
+    Args:
+        default_key (str): clave activa por defecto (ej. "referencial")
+        secciones (dict): diccionario con estructura {clave: (label visible, hoja Excel)}
 
-    Retorna:
-    - label seleccionado (ej. "Tablas de origen")
+    Returns:
+        str: clave activa seleccionada
     """
-    query_key = f"{key}_subview"
-
-    # Leer del query param si existe
     qp = st.query_params
-    default_label = labels[0]
-    active_label = qp.get(query_key, [default_label])[0]
+    active = qp.get("subview", [default_key])[0]
 
-    # Mostrar radio horizontal
-    selected_label = st.radio(
-        label="",
+    tabs = list(secciones.keys())
+    labels = [secciones[k][0] for k in tabs]
+    label_to_key = {v: k for k, v in secciones.items()}
+
+    selected_label = st.selectbox(
+        "Sección",
         options=labels,
-        index=labels.index(active_label) if active_label in labels else 0,
-        horizontal=True,
-        key=f"radio_{key}"
+        index=tabs.index(active) if active in tabs else 0,
+        key="subnav_selector"
     )
 
-    # Actualizar query param si cambió
-    if selected_label != active_label:
-        st.query_params[query_key] = selected_label
-        st.rerun()
-
-    return selected_label
+    new_key = label_to_key.get(selected_label, default_key)
+    st.query_params["subview"] = new_key
+    return new_key
