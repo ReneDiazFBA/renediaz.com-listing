@@ -43,8 +43,8 @@ with st.sidebar:
 
 # Vista según sección seleccionada
 if seleccion == "Datos":
-    st.title("📂 Módulo: Datos")
-    st.info("Aquí va la carga del archivo Excel. [Placeholder]")
+    from datos.app_datos_upload import mostrar_carga_excel
+    mostrar_carga_excel()
 
 elif seleccion == "Keywords":
     st.title("🔑 Módulo: Keywords")
