@@ -26,6 +26,14 @@ def mostrar_keywords_data(excel_data: Optional[pd.ExcelFile] = None):
     render_subnav(active, secciones)
     st.divider()
 
+    if active == "referencial":
+        from keywords.app_keywords_referencial import mostrar_tabla_referencial
+        mostrar_tabla_referencial(excel_data, sheet_name)
+    elif active == "competidores":
+        st.info("Reverse ASIN Competidores [pendiente]")
+    elif active == "mining":
+        st.info("Mining de Keywords [pendiente]")
+
     # Placeholder (sin cargar ningún módulo aún)
     label_visible, sheet_name = secciones.get(
         active, ("Vista no definida", None))
