@@ -1,8 +1,5 @@
-# app.py
-
 import streamlit as st
 from streamlit_option_menu import option_menu
-from keywords.loader_deduplicados import cargar_deduplicados
 
 st.set_page_config(page_title="ReneDiaz.com Listing", layout="wide")
 
@@ -43,10 +40,10 @@ if seccion_principal == "Datos":
 
     try:
         if "excel_data" in st.session_state and st.session_state.excel_data is not None:
+            from keywords.loader_deduplicados import cargar_deduplicados
             cargar_deduplicados(st.session_state.excel_data)
     except ModuleNotFoundError:
         st.warning("Módulo 'loader_deduplicados' no disponible todavía.")
-
 
 elif seccion_principal == "Keywords":
     from keywords.app_keywords_data import mostrar_keywords_data
