@@ -43,7 +43,7 @@ if seccion_principal == "Datos":
 elif seccion_principal == "Keywords":
     submodulo = st.radio(
         "Selecciona submódulo de Keywords:",
-        ["Tablas de origen", "Maestra deduplicada", ""],
+        ["Tablas de origen", "Maestra deduplicada", "Datos Estadísticos"],
         horizontal=True
     )
 
