@@ -106,8 +106,8 @@ def formatear_columnas_tabla(df: pd.DataFrame) -> pd.DataFrame:
             continue  # no tocar estas columnas
 
         def format_val(x, fuente, col):
-            if pd.isna(x):
-                # NAF: columna no relevante a la hoja
+            if pd.isna(x) or str(x).lower() == "nan":
+
                 if fuente == "CustKW" and col in [
                     "Comp Click Share", "Niche Click Share", "Comp Depth", "Niche Depth", "Relevancy"
                 ]:
