@@ -1,6 +1,8 @@
 # keywords/app_keywords_estadistica.py
 import streamlit as st
 import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 from typing import Optional
 from utils.nav_utils import render_subnav
 
@@ -86,8 +88,51 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
             "Aquí se graficarán las distribuciones y relaciones. [Placeholder]")
 
     elif active == "correlaciones":
-        st.subheader("Correlaciones")
-        st.info("Aquí se mostrará la matriz de correlaciones. [Placeholder]")
+        st.subheader("Matriz de Correlación")
+
+        df_corr = df_filtrado.select_dtypes(include="number").copy()
+        df_corr = df_corr.replace([-1, -2], np.nan).dropna(axis=1)
+
+        if df_corr.shape[1] < 2:
+            st.warning(
+                "No hay suficientes columnas numéricas para calcular correlaciones.")
+            return
+
+        corr_pearson = df_corr.corr(method="pearson")
+        corr_spearman = df_corr.corr(method="spearman")
+
+        st.markdown("##### Pearson (lineal)")
+        st.dataframe(corr_pearson.round(2), use_container_width=True)
+
+        st.markdown("##### Spearman (monótona)")
+        st.dataframe(corr_spearman.round(2), use_container_width=True)
+
+        st.markdown("##### Heatmap de correlaciones (Pearson)")
+        fig, ax = plt.subplots(figsize=(10, 6))
+        sns.heatmap(corr_pearson, annot=True, cmap="coolwarm", center=0, ax=ax)
+        st.pyplot(fig)
+
+        st.markdown("##### Interpretación automática")
+        umbral_alta = 0.85
+        correlaciones_altas = []
+
+        for i, col1 in enumerate(corr_pearson.columns):
+            for j, col2 in enumerate(corr_pearson.columns):
+                if i < j:
+                    coef = corr_pearson.iloc[i, j]
+                    if abs(coef) >= umbral_alta:
+                        correlaciones_altas.append((col1, col2, coef))
+
+        if not correlaciones_altas:
+            st.success("No se detectaron correlaciones fuertes entre columnas.")
+        else:
+            for col1, col2, coef in correlaciones_altas:
+                tipo = "positivamente" if coef > 0 else "negativamente"
+                st.markdown(
+                    f"- **{col1}** y **{col2}** están **{tipo} correladas** (ρ = {coef:.2f})")
+
+            st.info(
+                "Considera filtrar o priorizar solo una de estas columnas para evitar redundancia.")
 
     elif active == "ia":
         st.subheader("Análisis con IA")
