@@ -13,7 +13,7 @@ def imputar_valores_vacios(df: pd.DataFrame) -> pd.DataFrame:
 
     mapeo_columnas = {
         "CustKW": ["ASIN Click Share", "Search Volume", "ABA Rank"],
-        "CompKW": ["Comp Click Share", "Search Volume", "Comp Depth"],
+        "CompKW": ["Comp Click Share", "Search Volume", "Comp Depth", "ABA Rank"],
         "MiningKW": ["Niche Click Share", "Search Volume", "Niche Depth", "Relevancy"]
     }
 
@@ -57,7 +57,7 @@ def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
 
         min_val = 0.0
         max_val = float(col_validos.max())
-        step = 0.01 if "Click Share" in col else 1.0
+        step = 0.001 if "Click Share" in col else 1.0
 
         excluir_faltantes = st.checkbox(
             f"Excluir registros con valor faltante en '{col}' (-1)",
@@ -74,11 +74,10 @@ def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
             key=f"slider_{col}"
         )
 
-        # Registros que cumplen alguna de estas condiciones:
+        # Registros que cumplen todas estas condiciones:
         filtro = (
-            (col_data == -2) |                         # siempre incluir -2
-            # valores dentro del rango
-            (col_data.between(rango[0], rango[1]))
+            (col_data == -2) |                      # incluir -2 siempre
+            (col_data.between(rango[0], rango[1]))  # dentro del rango
         )
 
         if not excluir_faltantes:
