@@ -1,4 +1,5 @@
 # keywords/funcional_keywords_estadistica.py
+from scipy.stats import skew
 import streamlit as st
 import pandas as pd
 
@@ -159,3 +160,24 @@ def calcular_descriptivos_extendidos(df: pd.DataFrame) -> pd.DataFrame:
         }
 
     return pd.DataFrame(descriptivos).T.reset_index().rename(columns={"index": "Columna"})
+
+
+def sugerir_log_transform(df: pd.DataFrame) -> dict:
+    """
+    Analiza skewness para columnas numéricas y sugiere aplicar log10 si skew > 1 o < -1.
+    """
+    sugerencias = {}
+    columnas_numericas = df.select_dtypes(include=["number"]).columns
+
+    for col in columnas_numericas:
+        datos = df[col].dropna()
+        datos_validos = datos[datos > 0]  # log10 solo válido en positivos
+
+        if len(datos_validos) < 3:
+            sugerencias[col] = None
+            continue
+
+        valor_skew = skew(datos_validos)
+        sugerencias[col] = valor_skew if abs(valor_skew) > 1 else None
+
+    return sugerencias
