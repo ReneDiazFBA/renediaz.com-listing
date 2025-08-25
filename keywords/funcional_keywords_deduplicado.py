@@ -120,17 +120,14 @@ def formatear_columnas_tabla(df: pd.DataFrame) -> pd.DataFrame:
                 ]:
                     return "NAF"
                 else:
-                    return ""  # celda vacía en hoja original = dejar vacío
+                    return ""  # celda vacía = NaN real
             else:
+                # Aquí nos aseguramos que 0 se procese correctamente
                 if col in ["Search Volume", "ABA Rank", "Comp Depth", "Niche Depth", "Relevancy"]:
                     return f"{int(x):,}"
                 elif "Click Share" in col:
                     return f"{float(x) * 100:.2f}%"
                 else:
                     return x
-
-        df_format[col] = df_format.apply(
-            lambda row: format_val(row[col], row["Fuente"]), axis=1
-        )
 
     return df_format
