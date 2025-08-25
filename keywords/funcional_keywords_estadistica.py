@@ -115,3 +115,47 @@ def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
         df_filtrado = df_filtrado[filtro_total]
 
     return df_filtrado
+
+
+def calcular_descriptivos_extendidos(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calcula estadísticas descriptivas extendidas para columnas numéricas,
+    excluyendo valores -1 y -2.
+    """
+    df_numeric = df.select_dtypes(include="number").copy()
+
+    # Excluir valores -1 (faltantes) y -2 (irrelevantes)
+    df_clean = df_numeric[(df_numeric > -1).all(axis=1)]
+
+    descriptivos = {}
+
+    for col in df_numeric.columns:
+        serie = df_numeric[col]
+        serie_valida = serie[(serie != -1) & (serie != -2)]
+
+        if serie_valida.empty:
+            continue
+
+        q1 = serie_valida.quantile(0.25)
+        q2 = serie_valida.quantile(0.50)
+        q3 = serie_valida.quantile(0.75)
+        moda = serie_valida.mode()
+
+        descriptivos[col] = {
+            "Count": serie_valida.count(),
+            "Mean": serie_valida.mean(),
+            "Median": serie_valida.median(),
+            "Mode": ", ".join(map(str, moda.tolist())) if not moda.empty else "N/A",
+            "Std": serie_valida.std(),
+            "Variance": serie_valida.var(),
+            "Min": serie_valida.min(),
+            "Max": serie_valida.max(),
+            "Range": serie_valida.max() - serie_valida.min(),
+            "Q1 (25%)": q1,
+            "Q2 (50%)": q2,
+            "Q3 (75%)": q3,
+            "IQR": q3 - q1,
+            "Sum": serie_valida.sum(),
+        }
+
+    return pd.DataFrame(descriptivos).T.reset_index().rename(columns={"index": "Columna"})

@@ -41,6 +41,13 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
             st.markdown(f"**Total Registros: {len(df_filtrado):,}**")
             st.dataframe(df_formateado, use_container_width=True)
 
+            # Descriptivos
+            from keywords.funcional_keywords_estadistica import calcular_descriptivos_extendidos
+
+            st.subheader("Estadística descriptiva")
+            df_descriptivos = calcular_descriptivos_extendidos(df_filtrado)
+            st.dataframe(df_descriptivos, use_container_width=True)
+
     elif active == "graficos":
         st.subheader("Gráficos")
         st.info(
