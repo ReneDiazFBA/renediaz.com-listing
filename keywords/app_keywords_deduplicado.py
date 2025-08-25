@@ -38,7 +38,15 @@ def mostrar_keywords_deduplicado(excel_data: Optional[pd.ExcelFile] = None):
         st.dataframe(df_raw, use_container_width=True)
 
     elif subvista == "deduplicado":
-        st.markdown("#### Maestra Deduplicada")
-        st.caption(
-            "Versión deduplicada consolidando métricas y fuentes (en construcción).")
-        st.info("⚠️ Esta vista está en desarrollo.")
+    from keywords.funcional_keywords_deduplicado import build_master_deduplicated
+    st.markdown("#### Maestra Deduplicada")
+    st.caption("Versión deduplicada consolidando métricas y fuentes comunes.")
+
+    df_dedup = build_master_deduplicated(excel_data)
+
+    if df_dedup is None or df_dedup.empty:
+        st.error("No se pudo construir la vista deduplicada.")
+        return
+
+    st.markdown(f"**Total Registros: {len(df_dedup):,}**")
+    st.dataframe(df_dedup, use_container_width=True)
