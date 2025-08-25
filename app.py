@@ -44,7 +44,7 @@ if seccion_principal == "Datos":
             from keywords.loader_deduplicados import cargar_deduplicados
             cargar_deduplicados(st.session_state.excel_data)
             st.caption(
-                f"🔄 deduplicado cargado: {'master_deduped' in st.session_state}")
+                f"deduplicado cargado: {'master_deduped' in st.session_state}")
     except ModuleNotFoundError:
         st.warning("Módulo 'loader_deduplicados' no disponible todavía.")
 
