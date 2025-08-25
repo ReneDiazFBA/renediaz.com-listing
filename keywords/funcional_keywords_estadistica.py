@@ -17,6 +17,15 @@ def imputar_valores_vacios(df: pd.DataFrame) -> pd.DataFrame:
         "MiningKW": ["Niche Click Share", "Search Volume", "Niche Depth", "Relevancy"]
     }
 
+ # 🔧 Forzar conversión de columnas numéricas por seguridad
+    todas_columnas = set()
+    for columnas in mapeo_columnas.values():
+        todas_columnas.update(columnas)
+
+    for col in todas_columnas:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+
     columnas_numericas = df.select_dtypes(include=["number"]).columns
 
     for col in columnas_numericas:
