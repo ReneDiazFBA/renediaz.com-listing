@@ -90,8 +90,11 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
 
     elif active == "correlaciones":
         st.subheader("Correlaciones entre métricas")
+
         from keywords.funcional_keywords_estadistica import (
             calcular_correlaciones,
+            filtrar_por_sliders,
+            aplicar_log10_dinamico,
         )
 
         df_original = st.session_state.master_deduped.copy()
