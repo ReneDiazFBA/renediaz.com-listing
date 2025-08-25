@@ -106,7 +106,9 @@ def formatear_columnas_tabla(df: pd.DataFrame) -> pd.DataFrame:
             continue  # no tocar estas columnas
 
         def format_val(x, fuente):
+            # Si el valor está vacío (NaN real del Excel)
             if pd.isna(x):
+                # NAF = columna no aplica a la hoja
                 if fuente == "CustKW" and col in [
                     "Comp Click Share", "Niche Click Share", "Comp Depth", "Niche Depth", "Relevancy"
                 ]:
@@ -120,9 +122,9 @@ def formatear_columnas_tabla(df: pd.DataFrame) -> pd.DataFrame:
                 ]:
                     return "NAF"
                 else:
-                    return ""  # celda vacía = NaN real
+                    return ""  # NaN real del Excel → celda vacía
             else:
-                # Aquí nos aseguramos que 0 se procese correctamente
+                # El valor existe (0 o número válido)
                 if col in ["Search Volume", "ABA Rank", "Comp Depth", "Niche Depth", "Relevancy"]:
                     return f"{int(x):,}"
                 elif "Click Share" in col:
