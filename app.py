@@ -49,10 +49,11 @@ elif seccion_principal == "Keywords":
 
     if submodulo == "Tablas de origen":
         from keywords.app_keywords_data import mostrar_keywords_data
-        mostrar_keywords_data()
+        mostrar_keywords_data(st.session_state.excel_data)
     elif submodulo == "Maestra deduplicada":
         from keywords.app_keywords_deduplicado import mostrar_keywords_deduplicado
-        mostrar_keywords_deduplicado()
+        mostrar_keywords_deduplicado(st.session_state.excel_data)
+
 
 elif seccion_principal == "Mercado":
     st.title("Módulo: Mercado")
