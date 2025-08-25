@@ -5,6 +5,8 @@ from streamlit_option_menu import option_menu
 
 st.set_page_config(page_title="ReneDiaz.com Listing", layout="wide")
 
+st.set_page_config(page_title="ReneDiaz.com Listing", layout="wide")
+
 # 1. Menú lateral — sin íconos, sin submenús rotos
 with st.sidebar:
     st.markdown("## Navegación")
