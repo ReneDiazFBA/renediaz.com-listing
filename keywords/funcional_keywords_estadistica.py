@@ -50,12 +50,68 @@ def imputar_valores_vacios(df: pd.DataFrame) -> pd.DataFrame:
 
 def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Versión temporal sin aplicar filtros, para debug.
-    Solo ejecuta imputación, sin sliders, ni checkboxes ni condiciones.
+    Aplica filtros tipo slider para columnas numéricas.
+    - -2 siempre se muestra.
+    - -1 se filtra solo si el checkbox está activado.
+    - Slider aplica solo sobre valores >= 0.
     """
     df = imputar_valores_vacios(df)
+    df_filtrado = df.copy()
 
-    st.markdown("### Filtros dinámicos (pausados temporalmente)")
-    st.info("Filtros desactivados para validar si se muestran los 358 registros sin excluir nada.")
+    columnas_numericas = df_filtrado.select_dtypes(
+        include=["number"]).columns.tolist()
+    if not columnas_numericas:
+        st.info("No hay columnas numéricas para filtrar.")
+        return df_filtrado
 
-    return df  # ← Devuelve el dataframe completo sin filtrar
+    st.markdown("### Filtros dinámicos")
+
+    filtros = []
+
+    for col in columnas_numericas:
+        col_data = df_filtrado[col]
+
+        col_validos = col_data[col_data >= 0]
+        if col_validos.empty:
+            continue
+
+        min_val = float(col_validos.min())
+        max_val = float(col_validos.max())
+        step = 0.001 if "Click Share" in col else 1.0
+
+        excluir_faltantes = st.checkbox(
+            f"Excluir registros con valor faltante en '{col}' (-1)",
+            value=False,
+            key=f"check_{col}"
+        )
+
+        # Protección contra sliders sin rango
+        if min_val == max_val:
+            rango = (min_val, max_val)
+        else:
+            rango = st.slider(
+                f"{col}:",
+                min_value=min_val,
+                max_value=max_val,
+                value=(min_val, max_val),
+                step=step,
+                key=f"slider_{col}"
+            )
+
+        filtro_col = (
+            (col_data == -2) |
+            (col_data.between(rango[0], rango[1]))
+        )
+
+        if not excluir_faltantes:
+            filtro_col |= (col_data == -1)
+
+        filtros.append(filtro_col)
+
+    if filtros:
+        filtro_total = filtros[0]
+        for f in filtros[1:]:
+            filtro_total &= f
+        df_filtrado = df_filtrado[filtro_total]
+
+    return df_filtrado
