@@ -197,7 +197,7 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
             st.markdown(f"- {linea}")
 
     elif active == "inferencial":
-        st.subheader("Análisis Inferencial")
+        st.subheader("🔬 Análisis Inferencial")
 
         from keywords.funcional_keywords_estadistica import (
             filtrar_por_sliders,
@@ -205,21 +205,26 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
             realizar_tests_inferenciales
         )
 
-        df_original = st.session_state.master_deduped.copy()
-        df_filtrado = filtrar_por_sliders(df_original)
-        df_transformado = aplicar_log10_dinamico(df_filtrado)
+        with st.spinner("Procesando análisis inferencial..."):
+            df_original = st.session_state.master_deduped.copy()
+            df_filtrado = filtrar_por_sliders(df_original)
+            df_transformado = aplicar_log10_dinamico(df_filtrado)
 
-        resultados = realizar_tests_inferenciales(df_transformado)
+            resultados = realizar_tests_inferenciales(df_transformado)
 
-        st.subheader("Comparación de métricas con pruebas inferenciales")
+        st.markdown("### 🎯 Comparación de métricas por cuartiles")
         st.caption(
-            "Compara el cuartil inferior vs superior para detectar si existen diferencias estadísticamente significativas.")
+            "Compara el 25% inferior vs el 25% superior de cada métrica para detectar diferencias estadísticamente significativas."
+        )
 
         if resultados:
+            st.success(
+                f"Se detectaron diferencias en {len(resultados)} métricas.")
             for linea in resultados:
                 st.markdown(f"- {linea}")
         else:
-            st.info("No se detectaron diferencias estadísticamente significativas.")
+            st.info(
+                "No se detectaron diferencias estadísticamente significativas en las métricas seleccionadas.")
 
     elif active == "ia":
         st.subheader("Análisis con IA")
