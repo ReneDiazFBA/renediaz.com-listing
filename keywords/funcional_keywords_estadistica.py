@@ -213,3 +213,24 @@ def aplicar_log10_dinamico(df: pd.DataFrame) -> pd.DataFrame:
 
     df.rename(columns=nuevas_columnas, inplace=True)
     return df
+
+
+def calcular_correlaciones(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Calcula matrices de correlación (Pearson y Spearman) sobre columnas numéricas,
+    imputando -1 como 0 y excluyendo -2.
+    """
+    df_corr = df.copy()
+    columnas_numericas = df_corr.select_dtypes(include="number").columns
+
+    # Convertir -1 a 0 (faltantes reales) y eliminar -2 (irrelevante)
+    df_corr = df_corr[columnas_numericas].replace(-1, 0)
+    df_corr = df_corr[(df_corr != -2).all(axis=1)]
+
+    if df_corr.shape[1] < 2:
+        return None, None
+
+    pearson = df_corr.corr(method="pearson")
+    spearman = df_corr.corr(method="spearman")
+
+    return pearson, spearman

@@ -89,55 +89,51 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
             "Aquí se graficarán las distribuciones y relaciones. [Placeholder]")
 
     elif active == "correlaciones":
-        st.subheader("Matriz de Correlación")
-
-        from keywords.funcional_keywords_estadistica import filtrar_por_sliders
+        st.subheader("Correlaciones entre métricas")
+        from keywords.funcional_keywords_estadistica import (
+            calcular_correlaciones,
+        )
 
         df_original = st.session_state.master_deduped.copy()
         df_filtrado = filtrar_por_sliders(df_original)
-        df_corr = df_filtrado.select_dtypes(include="number").copy()
-        df_corr = df_corr.replace([-1, -2], np.nan).dropna(axis=1)
+        df_transformado = aplicar_log10_dinamico(df_filtrado)
 
-        if df_corr.shape[1] < 2:
+        pearson, spearman = calcular_correlaciones(df_transformado)
+
+        if pearson is None or spearman is None:
             st.warning(
                 "No hay suficientes columnas numéricas para calcular correlaciones.")
             return
 
-        corr_pearson = df_corr.corr(method="pearson")
-        corr_spearman = df_corr.corr(method="spearman")
+        st.markdown("#### Matriz de correlación (Pearson)")
+        st.dataframe(pearson.style.background_gradient(
+            cmap="Blues"), use_container_width=True)
 
-        st.markdown("##### Pearson (lineal)")
-        st.dataframe(corr_pearson.round(2), use_container_width=True)
+        st.markdown("#### Matriz de correlación (Spearman)")
+        st.dataframe(spearman.style.background_gradient(
+            cmap="Purples"), use_container_width=True)
 
-        st.markdown("##### Spearman (monótona)")
-        st.dataframe(corr_spearman.round(2), use_container_width=True)
+        # Interpretación automática
+        st.markdown("#### Interpretación automática")
+        umbral = 0.7
+        textos = []
 
-        st.markdown("##### Heatmap de correlaciones (Pearson)")
-        fig, ax = plt.subplots(figsize=(10, 6))
-        sns.heatmap(corr_pearson, annot=True, cmap="coolwarm", center=0, ax=ax)
-        st.pyplot(fig)
+        for metodo, matriz in [("Pearson", pearson), ("Spearman", spearman)]:
+            for i in matriz.columns:
+                for j in matriz.columns:
+                    if i != j:
+                        val = matriz.loc[i, j]
+                        if abs(val) > umbral:
+                            tipo = "positiva" if val > 0 else "negativa"
+                            textos.append(
+                                f"- **{i}** y **{j}** tienen una correlación {tipo} fuerte ({metodo}: {val:.2f})")
 
-        st.markdown("##### Interpretación automática")
-        umbral_alta = 0.85
-        correlaciones_altas = []
-
-        for i, col1 in enumerate(corr_pearson.columns):
-            for j, col2 in enumerate(corr_pearson.columns):
-                if i < j:
-                    coef = corr_pearson.iloc[i, j]
-                    if abs(coef) >= umbral_alta:
-                        correlaciones_altas.append((col1, col2, coef))
-
-        if not correlaciones_altas:
-            st.success("No se detectaron correlaciones fuertes entre columnas.")
+        if textos:
+            for linea in textos:
+                st.markdown(linea)
         else:
-            for col1, col2, coef in correlaciones_altas:
-                tipo = "positivamente" if coef > 0 else "negativamente"
-                st.markdown(
-                    f"- **{col1}** y **{col2}** están **{tipo} correladas** (ρ = {coef:.2f})")
-
             st.info(
-                "Considera filtrar o priorizar solo una de estas columnas para evitar redundancia.")
+                "No se encontraron correlaciones fuertes (>|0.70|) entre pares de columnas.")
 
     elif active == "ia":
         st.subheader("Análisis con IA")
