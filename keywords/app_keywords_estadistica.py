@@ -196,7 +196,7 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
         for linea in interpretaciones_pearson + interpretaciones_spearman:
             st.markdown(f"- {linea}")
 
-    elif active == "Inferencia":
+    elif active == "i1nferencia":
         st.subheader("Análisis Inferencial")
 
         from keywords.funcional_keywords_estadistica import (
