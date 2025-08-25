@@ -47,8 +47,11 @@ def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
     st.markdown("### Filtros dinámicos")
 
     for col in columnas_numericas:
-        min_val = float(df_filtrado[col].min())
-        max_val = float(df_filtrado[col].max())
+        # Excluir filas con -2 (irrelevante) antes de calcular min/max
+        df_col = df_filtrado[df_filtrado[col] != -2]
+
+        min_val = 0.0
+        max_val = float(df_col[col].max())
 
         step = 0.01 if "Click Share" in col else 1.0
 
@@ -61,6 +64,18 @@ def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
             key=f"slider_{col}"
         )
 
-        df_filtrado = df_filtrado[df_filtrado[col].between(rango[0], rango[1])]
+        incluir_faltantes = st.checkbox(
+            f"Incluir valores faltantes (-1) en {col}",
+            value=True,
+            key=f"chk_{col}"
+        )
+
+        # Aplicar filtros dinámicos
+        cond_rango = df_filtrado[col].between(rango[0], rango[1])
+        cond_faltantes = (df_filtrado[col] == -
+                          1) if incluir_faltantes else False
+        cond_validos = (df_filtrado[col] != -2)
+
+        df_filtrado = df_filtrado[cond_validos & (cond_rango | cond_faltantes)]
 
     return df_filtrado
