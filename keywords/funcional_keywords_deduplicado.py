@@ -76,19 +76,26 @@ def build_master_deduplicated(excel_data: pd.ExcelFile) -> pd.DataFrame:
     if df_raw.empty:
         return pd.DataFrame()
 
-    # Agrupar por Search Terms y combinar métricas
-    def combinar_fuentes(col):
-        return ",".join(sorted(df_raw.loc[~df_raw[col].isin(["NAF", None, np.nan]), "Fuente"].unique()))
+    def max_or_naf(x):
+        valores = [v for v in x if isinstance(
+            v, (int, float)) and not pd.isna(v)]
+        return np.nanmax(valores) if valores else "NAF"
+
+    def first_valid_or_naf(x):
+        for v in x:
+            if v != "NAF":
+                return v
+        return "NAF"
 
     grouped = df_raw.groupby("Search Terms").agg({
-        "Search Volume": lambda x: np.nanmax([v for v in x if v != "NAF"]),
-        "ABA Rank": lambda x: np.nanmax([v for v in x if v != "NAF"]),
-        "ASIN Click Share": lambda x: x[x != "NAF"].iloc[0] if any(x != "NAF") else "NAF",
-        "Comp Click Share": lambda x: x[x != "NAF"].iloc[0] if any(x != "NAF") else "NAF",
-        "Niche Click Share": lambda x: x[x != "NAF"].iloc[0] if any(x != "NAF") else "NAF",
-        "Comp Depth": lambda x: x[x != "NAF"].iloc[0] if any(x != "NAF") else "NAF",
-        "Niche Depth": lambda x: x[x != "NAF"].iloc[0] if any(x != "NAF") else "NAF",
-        "Relevancy": lambda x: x[x != "NAF"].iloc[0] if any(x != "NAF") else "NAF",
+        "Search Volume": max_or_naf,
+        "ABA Rank": max_or_naf,
+        "ASIN Click Share": first_valid_or_naf,
+        "Comp Click Share": first_valid_or_naf,
+        "Niche Click Share": first_valid_or_naf,
+        "Comp Depth": first_valid_or_naf,
+        "Niche Depth": first_valid_or_naf,
+        "Relevancy": first_valid_or_naf,
         "Fuente": lambda x: ",".join(sorted(set(",".join(x).split(","))))
     }).reset_index()
 
