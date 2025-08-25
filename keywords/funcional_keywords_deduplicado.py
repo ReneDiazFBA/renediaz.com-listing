@@ -20,7 +20,7 @@ def build_master_raw(excel_data: pd.ExcelFile) -> pd.DataFrame:
         except Exception:
             return pd.Series([None] * len(df), index=df.index)
 
-        cust_df = pd.DataFrame()
+    cust_df = pd.DataFrame()
 
     cust_df["Search Terms"] = df_cust.iloc[:, 0]
     cust_df["Search Volume"] = df_cust.iloc[:, 15]
