@@ -158,7 +158,7 @@ def calcular_descriptivos_extendidos(df: pd.DataFrame) -> pd.DataFrame:
             "IQR": q3 - q1,
             "Sum": serie_valida.sum(),
             "Skewness": skew(serie_valida) if len(serie_valida) >= 3 else None,
-            "Curtosis": curtosis if len(serie_valida) >= 3 else None,
+            "Curtosis": curtosis(serie_valida) if len(serie_valida) >= 3 else None,
         }
 
     return pd.DataFrame(descriptivos).T.reset_index().rename(columns={"index": "Columna"})
