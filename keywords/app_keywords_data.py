@@ -16,7 +16,8 @@ def mostrar_keywords_data(excel_data: Optional[pd.ExcelFile] = None):
     submodulo = st.radio(
         "Selecciona submódulo de Keywords:",
         ["Tablas de origen", "Maestra deduplicada", "Datos Estadísticos"],
-        horizontal=True
+        horizontal=True,
+        key="kw_radio_submodulo"
     )
 
     st.divider()

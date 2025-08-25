@@ -41,22 +41,8 @@ if seccion_principal == "Datos":
     mostrar_carga_excel()
 
 elif seccion_principal == "Keywords":
-    submodulo = st.radio(
-        "Selecciona submódulo de Keywords:",
-        ["Tablas de origen", "Maestra deduplicada", "Datos Estadísticos"],
-        horizontal=True
-    )
-
-    if submodulo == "Tablas de origen":
-        from keywords.app_keywords_data import mostrar_keywords_data
-        mostrar_keywords_data(st.session_state.excel_data)
-    elif submodulo == "Maestra deduplicada":
-        from keywords.app_keywords_deduplicado import mostrar_keywords_deduplicado
-        mostrar_keywords_deduplicado(st.session_state.excel_data)
-    elif submodulo == "Datos Estadísticos":
-        from keywords.app_keywords_estadistica import mostrar_keywords_estadistica
-        mostrar_keywords_estadistica(st.session_state.excel_data)
-
+    from keywords.app_keywords_data import mostrar_keywords_data
+    mostrar_keywords_data(st.session_state.excel_data)
 
 elif seccion_principal == "Mercado":
     st.title("Módulo: Mercado")
