@@ -1,11 +1,10 @@
 # keywords/app_keywords_competidores.py
-# Reverse ASIN Competidores (CompKW) — con filtros y columna Comp Depth
+# Reverse ASIN Competidores (CompKW) — con filtros y columna ABA Rank
 
 import os
 import pandas as pd
 import streamlit as st
 from typing import Optional
-
 
 EXCEL_DISK_PATH = os.path.join("data", "raw", "optimizacion_listing.xlsx")
 
@@ -40,9 +39,9 @@ def mostrar_tabla_competidores(excel_data: Optional[pd.ExcelFile] = None, sheet_
 
     try:
         base = xl.parse(sheet_name, header=None)
-        df = base.iloc[2:, [0, 8, 2, 5]].copy()
+        df = base.iloc[2:, [0, 8, 2, 5, 7]].copy()
         df.columns = ["Search Terms", "Search Volume",
-                      "Comp Click Share", "Comp Depth"]
+                      "Comp Click Share", "Comp Depth", "ABA Rank"]
         df_total = df.copy()
     except Exception as e:
         st.error(f"No se pudo leer la hoja '{sheet_name}': {e}")
@@ -50,7 +49,7 @@ def mostrar_tabla_competidores(excel_data: Optional[pd.ExcelFile] = None, sheet_
 
     df = df.dropna(subset=["Search Terms"]).reset_index(drop=True)
 
-    for c in ["Search Volume", "Comp Depth", "Comp Click Share"]:
+    for c in ["Search Volume", "Comp Depth", "Comp Click Share", "ABA Rank"]:
         df[c] = pd.to_numeric(df[c], errors="coerce")
 
     col1, col2, col3 = st.columns(3)
@@ -93,8 +92,11 @@ def mostrar_tabla_competidores(excel_data: Optional[pd.ExcelFile] = None, sheet_
     df_filtrado["Comp Depth"] = df_filtrado["Comp Depth"].map(
         lambda x: f"{int(x):,}" if pd.notna(x) else "—"
     )
+    df_filtrado["ABA Rank"] = df_filtrado["ABA Rank"].map(
+        lambda x: f"{int(x):,}" if pd.notna(x) else "—"
+    )
 
     df_filtrado = df_filtrado[[
-        "Search Terms", "Search Volume", "Comp Click Share", "Comp Depth"
+        "Search Terms", "Search Volume", "Comp Click Share", "Comp Depth", "ABA Rank"
     ]]
     st.dataframe(df_filtrado, use_container_width=True)
