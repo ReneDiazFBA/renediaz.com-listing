@@ -2,6 +2,7 @@
 
 import streamlit as st
 from streamlit_option_menu import option_menu
+from keywords.loader_deduplicados import cargar_deduplicados
 
 st.set_page_config(page_title="ReneDiaz.com Listing", layout="wide")
 
@@ -39,6 +40,12 @@ with st.sidebar:
 if seccion_principal == "Datos":
     from datos.app_datos_upload import mostrar_carga_excel
     mostrar_carga_excel()
+
+    from keywords.loader_deduplicados import cargar_deduplicados
+
+    if "excel_data" in st.session_state and st.session_state.excel_data is not None:
+        cargar_deduplicados(st.session_state.excel_data)
+
 
 elif seccion_principal == "Keywords":
     from keywords.app_keywords_data import mostrar_keywords_data
