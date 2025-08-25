@@ -21,7 +21,7 @@ def build_master_raw(excel_data: pd.ExcelFile) -> pd.DataFrame:
             return pd.Series([None] * len(df), index=df.index)
 
         cust_df = pd.DataFrame()
-        cust_df = pd.DataFrame()
+
     cust_df["Search Terms"] = df_cust.iloc[:, 0]
     cust_df["Search Volume"] = df_cust.iloc[:, 15]
     cust_df["ASIN Click Share"] = df_cust.iloc[:, 1]
@@ -56,7 +56,6 @@ def build_master_raw(excel_data: pd.ExcelFile) -> pd.DataFrame:
     mining_df["Relevancy"] = df_mining.iloc[:, 2]
     mining_df["Fuente"] = "MiningKW"
     mining_df["ABA Rank"] = pd.Series([np.nan] * len(df_mining))
-
 
     master_raw = pd.concat([cust_df, comp_df, mining_df],
                            axis=0, ignore_index=True)
