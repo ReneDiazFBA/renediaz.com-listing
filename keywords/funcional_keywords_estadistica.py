@@ -58,7 +58,7 @@ def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
             continue
 
         # 🔧 FIX: usamos el valor mínimo real positivo
-        min_val = float(col_validos.min())
+        min_val = 0.0
         max_val = float(col_validos.max())
         step = 0.001 if "Click Share" in col else 1.0
 
