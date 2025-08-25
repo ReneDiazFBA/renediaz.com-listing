@@ -1,6 +1,4 @@
 # keywords/funcional_keywords_deduplicado.py
-# Construye la tabla RAW consolidada desde CustKW, CompKW, MiningKW
-
 import pandas as pd
 import numpy as np
 import streamlit as st
@@ -82,14 +80,14 @@ def build_master_deduplicated(excel_data: pd.ExcelFile) -> pd.DataFrame:
 
     grouped = df_raw.groupby("Search Terms").agg({
         "Search Volume": pick_max_valid,
-        "ABA Rank": pick_max_valid,
         "ASIN Click Share": pick_first_valid,
         "Comp Click Share": pick_first_valid,
         "Niche Click Share": pick_first_valid,
         "Comp Depth": pick_first_valid,
         "Niche Depth": pick_first_valid,
         "Relevancy": pick_first_valid,
-        "Fuente": combinar_fuentes
+        "Fuente": combinar_fuentes,
+        "ABA Rank": pick_max_valid
     }).reset_index()
 
     return grouped
@@ -101,12 +99,16 @@ def formatear_columnas_tabla(df: pd.DataFrame) -> pd.DataFrame:
     for col in df_format.columns:
         if col in ["ASIN Click Share", "Comp Click Share", "Niche Click Share"]:
             df_format[col] = df_format[col].apply(
-                lambda x: f"{round(x*100, 2)}%" if isinstance(x,
-                                                              (int, float)) and not pd.isna(x) else x
+                lambda x: f"{round(x * 100, 2)}%" if isinstance(x,
+                                                                (int, float)) and not pd.isna(x) else x
             )
         elif col in ["Search Volume", "ABA Rank"]:
             df_format[col] = df_format[col].apply(
                 lambda x: f"{int(x):,}" if isinstance(
                     x, (int, float)) and not pd.isna(x) else x
             )
+
+    # Convertir valores None en 'NAF'
+    df_format.replace({None: "NAF", np.nan: "NAF"}, inplace=True)
+
     return df_format

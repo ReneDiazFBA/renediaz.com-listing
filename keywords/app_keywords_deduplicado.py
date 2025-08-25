@@ -4,11 +4,7 @@ import streamlit as st
 import pandas as pd
 from typing import Optional
 from utils.nav_utils import render_subnav
-from keywords.funcional_keywords_deduplicado import (
-    build_master_raw,
-    build_master_deduplicated,
-    formatear_columnas_tabla
-)
+from keywords.funcional_keywords_deduplicado import build_master_raw, build_master_deduplicated, formatear_columnas_tabla
 
 
 def mostrar_keywords_deduplicado(excel_data: Optional[pd.ExcelFile] = None):
@@ -17,8 +13,7 @@ def mostrar_keywords_deduplicado(excel_data: Optional[pd.ExcelFile] = None):
     """
     st.markdown("### Keywords — Maestra deduplicada")
     st.caption(
-        "Unificación y deduplicación inteligente de términos provenientes de todas las fuentes."
-    )
+        "Unificación y deduplicación inteligente de términos provenientes de todas las fuentes.")
 
     secciones = {
         "raw": ("Maestra Raw", "raw"),
@@ -34,7 +29,8 @@ def mostrar_keywords_deduplicado(excel_data: Optional[pd.ExcelFile] = None):
 
     if subvista == "raw":
         st.markdown("#### Maestra Raw")
-        st.caption("Unión completa de todas las fuentes sin deduplicar.")
+        st.caption(
+            "Unión completa de todas las fuentes (CustKW, CompKW, MiningKW) sin deduplicar.")
         df_raw = build_master_raw(excel_data)
         st.markdown(f"**Total Registros: {len(df_raw):,}**")
         st.dataframe(formatear_columnas_tabla(
@@ -44,9 +40,11 @@ def mostrar_keywords_deduplicado(excel_data: Optional[pd.ExcelFile] = None):
         st.markdown("#### Maestra Deduplicada")
         st.caption("Versión deduplicada consolidando métricas y fuentes comunes.")
         df_dedup = build_master_deduplicated(excel_data)
+
         if df_dedup is None or df_dedup.empty:
             st.error("No se pudo construir la vista deduplicada.")
             return
+
         st.markdown(f"**Total Registros: {len(df_dedup):,}**")
         st.dataframe(formatear_columnas_tabla(
             df_dedup), use_container_width=True)
