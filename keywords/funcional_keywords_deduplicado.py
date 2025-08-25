@@ -102,22 +102,35 @@ def formatear_columnas_tabla(df: pd.DataFrame) -> pd.DataFrame:
     df_format = df.copy()
 
     for col in df_format.columns:
-        if col in ["Search Volume", "ABA Rank"]:
-            df_format[col] = df_format[col].apply(
-                lambda x: f"{int(x):,}" if isinstance(
-                    x, (int, float)) and not pd.isna(x) else "NAF"
-            )
-        elif "Click Share" in col:
-            df_format[col] = df_format[col].apply(
-                lambda x: f"{float(x) * 100:.2f}%" if isinstance(x,
-                                                                 (int, float)) and not pd.isna(x) else "NAF"
-            )
-        elif "Depth" in col or "Relevancy" in col:
-            df_format[col] = df_format[col].apply(
-                lambda x: f"{int(x)}" if isinstance(
-                    x, (int, float)) and not pd.isna(x) else "NAF"
-            )
-        elif col == "Fuente":
-            df_format[col] = df_format[col].fillna("NAF")
+        if col in ["Search Terms", "Fuente"]:
+            continue  # no tocar estas columnas
+
+        def format_val(x, fuente):
+            if pd.isna(x):
+                if fuente == "CustKW" and col in [
+                    "Comp Click Share", "Niche Click Share", "Comp Depth", "Niche Depth", "Relevancy"
+                ]:
+                    return "NAF"
+                elif fuente == "CompKW" and col in [
+                    "ASIN Click Share", "Niche Click Share", "Niche Depth", "Relevancy", "ABA Rank"
+                ]:
+                    return "NAF"
+                elif fuente == "MiningKW" and col in [
+                    "ASIN Click Share", "Comp Click Share", "Comp Depth", "ABA Rank"
+                ]:
+                    return "NAF"
+                else:
+                    return ""  # celda vacía en hoja original = dejar vacío
+            else:
+                if col in ["Search Volume", "ABA Rank", "Comp Depth", "Niche Depth", "Relevancy"]:
+                    return f"{int(x):,}"
+                elif "Click Share" in col:
+                    return f"{float(x) * 100:.2f}%"
+                else:
+                    return x
+
+        df_format[col] = df_format.apply(
+            lambda row: format_val(row[col], row["Fuente"]), axis=1
+        )
 
     return df_format
