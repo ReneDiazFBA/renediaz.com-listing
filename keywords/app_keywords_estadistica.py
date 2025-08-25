@@ -67,6 +67,11 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
         st.subheader("Estadística descriptiva")
         df_descriptivos = calcular_descriptivos_extendidos(df_transformado)
         st.dataframe(df_descriptivos, use_container_width=True)
+        if "Shapiro Normality" in df_descriptivos.columns:
+            num_normales = df_descriptivos[df_descriptivos["Shapiro Normality"]
+                                           == "Normal"].shape[0]
+            st.success(
+                f"{num_normales} columnas parecen seguir una distribución normal.")
 
     elif active == "graficos":
         st.subheader("Gráficos")

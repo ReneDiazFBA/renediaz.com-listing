@@ -1,5 +1,5 @@
 # keywords/funcional_keywords_estadistica.py
-from scipy.stats import skew, kurtosis
+from scipy.stats import skew, kurtosis, shapiro
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -160,6 +160,13 @@ def calcular_descriptivos_extendidos(df: pd.DataFrame) -> pd.DataFrame:
             "Sum": serie_valida.sum(),
             "Skewness": skew(serie_valida) if len(serie_valida) >= 3 else None,
             "Kurtosis": kurtosis(serie_valida) if len(serie_valida) >= 3 else None,
+            "Z-Score Min": round(((serie_valida.min() - serie_valida.mean()) / serie_valida.std()), 2) if serie_valida.std() != 0 else None,
+            "Z-Score Max": round(((serie_valida.max() - serie_valida.mean()) / serie_valida.std()), 2) if serie_valida.std() != 0 else None,
+            "Coef. de Variación (%)": round((serie_valida.std() / serie_valida.mean()) * 100, 2) if serie_valida.mean() != 0 else None,
+            "Shapiro Normality": (
+                "Normal" if (len(serie_valida) >= 3 and shapiro(serie_valida).pvalue > 0.05)
+                else "No normal"
+            ) if len(serie_valida) >= 3 else "N/A",
         }
 
     return pd.DataFrame(descriptivos).T.reset_index().rename(columns={"index": "Columna"})
