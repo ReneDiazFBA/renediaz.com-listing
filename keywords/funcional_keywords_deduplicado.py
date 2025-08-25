@@ -19,64 +19,65 @@ def build_master_raw(excel_data: pd.ExcelFile) -> pd.DataFrame:
         st.error(f"Error al leer hojas del Excel: {e}")
         return pd.DataFrame()
 
-    def col(df, index, applies=True, numeric=False):
-        if not applies:
-            return np.nan
-        serie = df.iloc[:, index]
-        if numeric:
-            return pd.to_numeric(serie, errors="coerce")
-        return serie
+    # Utilidad para obtener columna numérica o dejar como None si no aplica
+    def safe_numeric(series):
+        return pd.to_numeric(series, errors="coerce")
 
-    # === CustKW ===
+    def nan_if_applicable(df, idx, apply=True):
+        if not apply:
+            return [None] * len(df)
+        return safe_numeric(df.iloc[:, idx])
+
+    # ========== CustKW ==========
     cust = pd.DataFrame()
-    cust["Search Terms"] = col(df_cust, 0)
-    cust["Search Volume"] = col(df_cust, 15, numeric=True)
-    cust["ASIN Click Share"] = col(df_cust, 1, numeric=True)
-    cust["ABA Rank"] = col(df_cust, 14, numeric=True)
+    cust["Search Terms"] = df_cust.iloc[:, 0].astype(str).str.strip()
+    cust["Search Volume"] = nan_if_applicable(df_cust, 15, apply=True)
+    cust["ABA Rank"] = nan_if_applicable(df_cust, 14, apply=True)
+    cust["ASIN Click Share"] = nan_if_applicable(df_cust, 1, apply=True)
+    cust["Comp Click Share"] = [None] * len(df_cust)
+    cust["Comp Depth"] = [None] * len(df_cust)
+    cust["Niche Click Share"] = [None] * len(df_cust)
+    cust["Niche Depth"] = [None] * len(df_cust)
+    cust["Relevancy"] = [None] * len(df_cust)
     cust["Fuente"] = "CustKW"
-    cust["Comp Click Share"] = np.nan
-    cust["Comp Depth"] = np.nan
-    cust["Niche Click Share"] = np.nan
-    cust["Niche Depth"] = np.nan
-    cust["Relevancy"] = np.nan
 
-    # === CompKW ===
+    # ========== CompKW ==========
     comp = pd.DataFrame()
-    comp["Search Terms"] = col(df_comp, 0)
-    comp["Search Volume"] = col(df_comp, 8, numeric=True)
-    comp["ASIN Click Share"] = np.nan
-    comp["ABA Rank"] = col(df_comp, 7, numeric=True)
+    comp["Search Terms"] = df_comp.iloc[:, 0].astype(str).str.strip()
+    comp["Search Volume"] = nan_if_applicable(df_comp, 8, apply=True)
+    comp["ABA Rank"] = nan_if_applicable(df_comp, 7, apply=True)
+    comp["ASIN Click Share"] = [None] * len(df_comp)
+    comp["Comp Click Share"] = nan_if_applicable(df_comp, 2, apply=True)
+    comp["Comp Depth"] = nan_if_applicable(df_comp, 5, apply=True)
+    comp["Niche Click Share"] = [None] * len(df_comp)
+    comp["Niche Depth"] = [None] * len(df_comp)
+    comp["Relevancy"] = [None] * len(df_comp)
     comp["Fuente"] = "CompKW"
-    comp["Comp Click Share"] = col(df_comp, 2, numeric=True)
-    comp["Comp Depth"] = col(df_comp, 5, numeric=True)
-    comp["Niche Click Share"] = np.nan
-    comp["Niche Depth"] = np.nan
-    comp["Relevancy"] = np.nan
 
-    # === MiningKW ===
+    # ========== MiningKW ==========
     mining = pd.DataFrame()
-    mining["Search Terms"] = col(df_mining, 0)
-    mining["Search Volume"] = col(df_mining, 5, numeric=True)
-    mining["ASIN Click Share"] = np.nan
-    mining["ABA Rank"] = np.nan
+    mining["Search Terms"] = df_mining.iloc[:, 0].astype(str).str.strip()
+    mining["Search Volume"] = nan_if_applicable(df_mining, 5, apply=True)
+    mining["ABA Rank"] = [None] * len(df_mining)
+    mining["ASIN Click Share"] = [None] * len(df_mining)
+    mining["Comp Click Share"] = [None] * len(df_mining)
+    mining["Comp Depth"] = [None] * len(df_mining)
+    mining["Niche Click Share"] = nan_if_applicable(df_mining, 15, apply=True)
+    mining["Niche Depth"] = nan_if_applicable(df_mining, 12, apply=True)
+    mining["Relevancy"] = nan_if_applicable(df_mining, 2, apply=True)
     mining["Fuente"] = "MiningKW"
-    mining["Comp Click Share"] = np.nan
-    mining["Comp Depth"] = np.nan
-    mining["Niche Click Share"] = col(df_mining, 15, numeric=True)
-    mining["Niche Depth"] = col(df_mining, 12, numeric=True)
-    mining["Relevancy"] = col(df_mining, 2, numeric=True)
 
-    # Unir todo
-    df_raw = pd.concat([cust, comp, mining], ignore_index=True)
+    # Unir todo en orden correcto
+    df_raw = pd.concat([cust, comp, mining], ignore_index=True)[[
+        "Search Terms", "Search Volume", "ABA Rank", "ASIN Click Share",
+        "Comp Click Share", "Comp Depth", "Niche Click Share", "Niche Depth",
+        "Relevancy", "Fuente"
+    ]]
 
-    # Limpiar strings
-    df_raw["Search Terms"] = df_raw["Search Terms"].astype(str).str.strip()
-
-    # Truncar Click Shares a 2 decimales
-    for colname in ["ASIN Click Share", "Comp Click Share", "Niche Click Share"]:
-        if colname in df_raw.columns:
-            df_raw[colname] = (df_raw[colname] * 100).apply(
-                lambda x: np.floor(x * 100) / 100 if pd.notnull(x) else np.nan
-            )
+    # Truncar shares (%)
+    for col in ["ASIN Click Share", "Comp Click Share", "Niche Click Share"]:
+        df_raw[col] = df_raw[col].apply(
+            lambda x: np.floor(x * 10000) / 100 if isinstance(x, float) else x
+        )
 
     return df_raw
