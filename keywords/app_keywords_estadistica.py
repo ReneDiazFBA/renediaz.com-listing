@@ -110,18 +110,24 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
                 "No hay suficientes columnas numéricas para calcular correlaciones.")
             return
 
-        # 🎨 Heatmap Pearson
+        # 🎨 Heatmap Pearson (azul corporativo)
         st.markdown("### Matriz de correlación (Pearson)")
-        fig1, ax1 = plt.subplots()
-        cmap_brand = LinearSegmentedColormap.from_list(
-            "brand", ["#f7931e", "#0071bc"])
-        sns.heatmap(pearson, cmap=cmap_brand, annot=True, fmt=".2f", ax=ax1)
+        fig1, ax1 = plt.subplots(figsize=(12, 6))
+        cmap_pearson = LinearSegmentedColormap.from_list(
+            "pearson_brand", ["#d3e9f7", "#0071bc"]
+        )
+        sns.heatmap(pearson, cmap=cmap_pearson, annot=True, fmt=".2f",
+                    linewidths=0.5, linecolor='white', ax=ax1)
         st.pyplot(fig1)
 
-        # 🎨 Heatmap Spearman
+        # 🎨 Heatmap Spearman (naranja corporativo)
         st.markdown("### Matriz de correlación (Spearman)")
-        fig2, ax2 = plt.subplots()
-        sns.heatmap(spearman, cmap=cmap_brand, annot=True, fmt=".2f", ax=ax2)
+        fig2, ax2 = plt.subplots(figsize=(12, 6))
+        cmap_spearman = LinearSegmentedColormap.from_list(
+            "spearman_brand", ["#ffe5cc", "#f7931e"]
+        )
+        sns.heatmap(spearman, cmap=cmap_spearman, annot=True, fmt=".2f",
+                    linewidths=0.5, linecolor='white', ax=ax2)
         st.pyplot(fig2)
 
         # 📊 Interpretación automática
