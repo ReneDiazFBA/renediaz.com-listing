@@ -4,6 +4,7 @@ import pandas as pd
 import seaborn as sns
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
 from typing import Optional
 from utils.nav_utils import render_subnav
 
@@ -95,6 +96,7 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
             calcular_correlaciones,
             filtrar_por_sliders,
             aplicar_log10_dinamico,
+            interpretar_correlaciones
         )
 
         df_original = st.session_state.master_deduped.copy()
@@ -108,35 +110,29 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
                 "No hay suficientes columnas numéricas para calcular correlaciones.")
             return
 
-        st.markdown("#### Matriz de correlación (Pearson)")
-        st.dataframe(pearson.style.background_gradient(
-            cmap="Blues"), use_container_width=True)
+        # 🎨 Heatmap Pearson
+        st.markdown("### Matriz de correlación (Pearson)")
+        fig1, ax1 = plt.subplots()
+        cmap_brand = LinearSegmentedColormap.from_list(
+            "brand", ["#f7931e", "#0071bc"])
+        sns.heatmap(pearson, cmap=cmap_brand, annot=True, fmt=".2f", ax=ax1)
+        st.pyplot(fig1)
 
-        st.markdown("#### Matriz de correlación (Spearman)")
-        st.dataframe(spearman.style.background_gradient(
-            cmap="Purples"), use_container_width=True)
+        # 🎨 Heatmap Spearman
+        st.markdown("### Matriz de correlación (Spearman)")
+        fig2, ax2 = plt.subplots()
+        sns.heatmap(spearman, cmap=cmap_brand, annot=True, fmt=".2f", ax=ax2)
+        st.pyplot(fig2)
 
-        # Interpretación automática
-        st.markdown("#### Interpretación automática")
-        umbral = 0.7
-        textos = []
+        # 📊 Interpretación automática
+        st.markdown("### Interpretación automática")
+        interpretaciones_pearson = interpretar_correlaciones(
+            pearson, metodo="Pearson")
+        interpretaciones_spearman = interpretar_correlaciones(
+            spearman, metodo="Spearman")
 
-        for metodo, matriz in [("Pearson", pearson), ("Spearman", spearman)]:
-            for i in matriz.columns:
-                for j in matriz.columns:
-                    if i != j:
-                        val = matriz.loc[i, j]
-                        if abs(val) > umbral:
-                            tipo = "positiva" if val > 0 else "negativa"
-                            textos.append(
-                                f"- **{i}** y **{j}** tienen una correlación {tipo} fuerte ({metodo}: {val:.2f})")
-
-        if textos:
-            for linea in textos:
-                st.markdown(linea)
-        else:
-            st.info(
-                "No se encontraron correlaciones fuertes (>|0.70|) entre pares de columnas.")
+        for linea in interpretaciones_pearson + interpretaciones_spearman:
+            st.markdown(f"- {linea}")
 
     elif active == "ia":
         st.subheader("Análisis con IA")

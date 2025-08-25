@@ -234,3 +234,40 @@ def calcular_correlaciones(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame
     spearman = df_corr.corr(method="spearman")
 
     return pearson, spearman
+
+
+def interpretar_correlaciones(matriz: pd.DataFrame, metodo: str = "Pearson") -> list:
+    """
+    Genera interpretación automática de una matriz de correlación.
+    """
+    interpretaciones = []
+    umbrales = [
+        (0.9, "muy fuerte"),
+        (0.7, "fuerte"),
+        (0.5, "moderada"),
+        (0.3, "débil"),
+        (0.1, "muy débil")
+    ]
+
+    ya_analizadas = set()
+
+    for col1 in matriz.columns:
+        for col2 in matriz.columns:
+            if col1 == col2 or (col2, col1) in ya_analizadas:
+                continue
+
+            ya_analizadas.add((col1, col2))
+            valor = matriz.loc[col1, col2]
+
+            signo = "positiva (directa)" if valor > 0 else "negativa (inversa)"
+            fuerza = "sin correlación"
+
+            for umbral, etiqueta in umbrales:
+                if abs(valor) >= umbral:
+                    fuerza = etiqueta
+                    break
+
+            interpretacion = f"**{col1}** y **{col2}** tienen una correlación {signo} {fuerza} ({metodo}: {valor:.2f})"
+            interpretaciones.append(interpretacion)
+
+    return interpretaciones
