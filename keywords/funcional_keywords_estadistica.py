@@ -39,7 +39,7 @@ def imputar_valores_vacios(df: pd.DataFrame) -> pd.DataFrame:
 
     for col in columnas_numericas:
         for fuente, columnas_relevantes in mapeo_columnas.items():
-            mask = (df["Fuente"] == fuente) & (df[col].isna())
+            mask = df["Fuente"].str.contains(fuente) & (df[col].isna())
             if col in columnas_relevantes:
                 df.loc[mask, col] = -1  # falta real
             else:
