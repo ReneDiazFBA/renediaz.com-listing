@@ -24,37 +24,38 @@ def build_master_raw(excel_data: pd.ExcelFile) -> pd.DataFrame:
     cust_df["Search Terms"] = df_cust.iloc[:, 0]
     cust_df["Search Volume"] = df_cust.iloc[:, 15]
     cust_df["ASIN Click Share"] = df_cust.iloc[:, 1]
-    cust_df["Comp Click Share"] = np.nan
-    cust_df["Niche Click Share"] = np.nan
-    cust_df["Comp Depth"] = np.nan
-    cust_df["Niche Depth"] = np.nan
-    cust_df["Relevancy"] = np.nan
+    cust_df["Comp Click Share"] = pd.Series([np.nan] * len(df_cust), index=df_cust.index)
+    cust_df["Niche Click Share"] = pd.Series([np.nan] * len(df_cust), index=df_cust.index)
+    cust_df["Comp Depth"] = pd.Series([np.nan] * len(df_cust), index=df_cust.index)
+    cust_df["Niche Depth"] = pd.Series([np.nan] * len(df_cust), index=df_cust.index)
+    cust_df["Relevancy"] = pd.Series([np.nan] * len(df_cust), index=df_cust.index)
     cust_df["ABA Rank"] = df_cust.iloc[:, 14]
     cust_df["Fuente"] = "CustKW"
 
     comp_df = pd.DataFrame()
     comp_df["Search Terms"] = df_comp.iloc[:, 0]
     comp_df["Search Volume"] = df_comp.iloc[:, 8]
-    comp_df["ASIN Click Share"] = np.nan
+    comp_df["ASIN Click Share"] = pd.Series([np.nan] * len(df_comp), index=df_comp.index)
     comp_df["Comp Click Share"] = df_comp.iloc[:, 2]
-    comp_df["Niche Click Share"] = np.nan
+    comp_df["Niche Click Share"] = pd.Series([np.nan] * len(df_comp), index=df_comp.index)
     comp_df["Comp Depth"] = df_comp.iloc[:, 5]
-    comp_df["Niche Depth"] = np.nan
-    comp_df["Relevancy"] = np.nan
-    comp_df["ABA Rank"] = np.nan
+    comp_df["Niche Depth"] = pd.Series([np.nan] * len(df_comp), index=df_comp.index)
+    comp_df["Relevancy"] = pd.Series([np.nan] * len(df_comp), index=df_comp.index)
+    comp_df["ABA Rank"] = pd.Series([np.nan] * len(df_comp), index=df_comp.index)
     comp_df["Fuente"] = "CompKW"
 
     mining_df = pd.DataFrame()
     mining_df["Search Terms"] = df_mining.iloc[:, 0]
     mining_df["Search Volume"] = df_mining.iloc[:, 5]
-    mining_df["ASIN Click Share"] = np.nan
-    mining_df["Comp Click Share"] = np.nan
+    mining_df["ASIN Click Share"] = pd.Series([np.nan] * len(df_mining), index=df_mining.index)
+    mining_df["Comp Click Share"] = pd.Series([np.nan] * len(df_mining), index=df_mining.index)
     mining_df["Niche Click Share"] = df_mining.iloc[:, 15]
-    mining_df["Comp Depth"] = np.nan
+    mining_df["Comp Depth"] = pd.Series([np.nan] * len(df_mining), index=df_mining.index)
     mining_df["Niche Depth"] = df_mining.iloc[:, 12]
     mining_df["Relevancy"] = df_mining.iloc[:, 2]
-    mining_df["ABA Rank"] = np.nan
+    mining_df["ABA Rank"] = pd.Series([np.nan] * len(df_mining), index=df_mining.index)
     mining_df["Fuente"] = "MiningKW"
+
 
     master_raw = pd.concat([cust_df, comp_df, mining_df],
                            axis=0, ignore_index=True)
