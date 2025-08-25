@@ -23,7 +23,7 @@ def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
         min_val = float(df_filtrado[col].min())
         max_val = float(df_filtrado[col].max())
 
-        step = 1.0 if "Click Share" in col else 1
+        step = 0.01 if "Click Share" in col else 1.0
         rango = st.slider(
             f"{col}:",
             min_value=min_val,
