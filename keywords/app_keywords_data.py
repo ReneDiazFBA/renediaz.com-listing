@@ -7,7 +7,7 @@ from typing import Optional
 from keywords.app_keywords_referencial import mostrar_tabla_referencial
 from keywords.app_keywords_competidores import mostrar_tabla_competidores
 from keywords.app_keywords_mining import mostrar_tabla_mining
-from keywords.app_keywords_deduplicado import mostrar_keywords_deduplicado 
+from keywords.app_keywords_deduplicado import mostrar_keywords_deduplicado
 from utils.nav_utils import render_subnav
 
 
@@ -18,7 +18,6 @@ def mostrar_keywords_data(excel_data: Optional[pd.ExcelFile] = None):
         "referencial": ("Reverse ASIN Referencial", "CustKW"),
         "competidores": ("Reverse ASIN Competidores", "CompKW"),
         "mining": ("Mining de Keywords", "MiningKW"),
-        "deduplicado": ("Maestra deduplicada", None)  
     }
 
     active = render_subnav("referencial", secciones)

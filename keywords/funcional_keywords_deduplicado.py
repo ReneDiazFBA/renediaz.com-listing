@@ -100,3 +100,26 @@ def build_master_deduplicated(excel_data: pd.ExcelFile) -> pd.DataFrame:
     }).reset_index()
 
     return grouped
+
+
+def formatear_columnas_tabla(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Formatea columnas numéricas para visualización:
+    - ABA Rank como entero sin decimales
+    - Click Shares como % con 2 decimales truncados
+    """
+    df = df.copy()
+
+    # ABA Rank → entero sin decimales (si es numérico)
+    if "ABA Rank" in df.columns:
+        df["ABA Rank"] = pd.to_numeric(
+            df["ABA Rank"], errors="coerce").dropna().astype("Int64").fillna("")
+
+    # Formateo de porcentajes truncados para Click Shares
+    share_cols = ["ASIN Click Share", "Comp Click Share", "Niche Click Share"]
+    for col in share_cols:
+        if col in df.columns:
+            df[col] = df[col].apply(
+                lambda x: f"{(float(x)*100):.2f}%" if isinstance(x, (float, int)) else x)
+
+    return df

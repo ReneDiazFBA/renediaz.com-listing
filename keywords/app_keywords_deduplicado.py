@@ -4,7 +4,7 @@ import streamlit as st
 import pandas as pd
 from typing import Optional
 from utils.nav_utils import render_subnav
-from keywords.funcional_keywords_deduplicado import build_master_raw
+from keywords.funcional_keywords_deduplicado import build_master_raw, formatear_columnas_tabla
 
 
 def mostrar_keywords_deduplicado(excel_data: Optional[pd.ExcelFile] = None):
@@ -35,7 +35,9 @@ def mostrar_keywords_deduplicado(excel_data: Optional[pd.ExcelFile] = None):
         df_raw = build_master_raw(excel_data)
 
         st.markdown(f"**Total Registros: {len(df_raw):,}**")
-        st.dataframe(df_raw, use_container_width=True)
+        from keywords.funcional_keywords_deduplicado import formatear_columnas_tabla
+        st.dataframe(formatear_columnas_tabla(
+            df_raw), use_container_width=True)
 
     elif subvista == "deduplicado":
         from keywords.funcional_keywords_deduplicado import build_master_deduplicated
@@ -49,4 +51,6 @@ def mostrar_keywords_deduplicado(excel_data: Optional[pd.ExcelFile] = None):
             return
 
         st.markdown(f"**Total Registros: {len(df_dedup):,}**")
-        st.dataframe(df_dedup, use_container_width=True)
+        from keywords.funcional_keywords_deduplicado import formatear_columnas_tabla
+        st.dataframe(formatear_columnas_tabla(
+            df_dedup), use_container_width=True)
