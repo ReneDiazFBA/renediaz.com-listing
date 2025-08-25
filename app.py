@@ -1,4 +1,4 @@
-##app.py
+# app.py
 import streamlit as st
 from streamlit_option_menu import option_menu
 
@@ -43,6 +43,8 @@ if seccion_principal == "Datos":
         if "excel_data" in st.session_state and st.session_state.excel_data is not None:
             from keywords.loader_deduplicados import cargar_deduplicados
             cargar_deduplicados(st.session_state.excel_data)
+            st.caption(
+                f"🔄 deduplicado cargado: {'master_deduped' in st.session_state}")
     except ModuleNotFoundError:
         st.warning("Módulo 'loader_deduplicados' no disponible todavía.")
 
