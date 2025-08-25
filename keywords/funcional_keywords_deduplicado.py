@@ -24,37 +24,37 @@ def build_master_raw(excel_data: pd.ExcelFile) -> pd.DataFrame:
     cust_df["Search Terms"] = df_cust.iloc[:, 0]
     cust_df["Search Volume"] = df_cust.iloc[:, 15]
     cust_df["ASIN Click Share"] = df_cust.iloc[:, 1]
-    cust_df["Comp Click Share"] = [None] * len(df_cust)
-    cust_df["Niche Click Share"] = [None] * len(df_cust)
-    cust_df["Comp Depth"] = [None] * len(df_cust)
-    cust_df["Niche Depth"] = [None] * len(df_cust)
-    cust_df["Relevancy"] = [None] * len(df_cust)
+    cust_df["Comp Click Share"] = np.nan  # columna inexistente en CustKW
+    cust_df["Niche Click Share"] = np.nan
+    cust_df["Comp Depth"] = np.nan
+    cust_df["Niche Depth"] = np.nan
+    cust_df["Relevancy"] = np.nan
     cust_df["Fuente"] = "CustKW"
     cust_df["ABA Rank"] = df_cust.iloc[:, 14]
 
     comp_df = pd.DataFrame()
     comp_df["Search Terms"] = df_comp.iloc[:, 0]
     comp_df["Search Volume"] = df_comp.iloc[:, 8]
-    comp_df["ASIN Click Share"] = [None] * len(df_comp)
+    comp_df["ASIN Click Share"] = np.nan
     comp_df["Comp Click Share"] = df_comp.iloc[:, 2]
-    comp_df["Niche Click Share"] = [None] * len(df_comp)
+    comp_df["Niche Click Share"] = np.nan
     comp_df["Comp Depth"] = df_comp.iloc[:, 5]
-    comp_df["Niche Depth"] = [None] * len(df_comp)
-    comp_df["Relevancy"] = [None] * len(df_comp)
+    comp_df["Niche Depth"] = np.nan
+    comp_df["Relevancy"] = np.nan
     comp_df["Fuente"] = "CompKW"
-    comp_df["ABA Rank"] = [None] * len(df_comp)
+    comp_df["ABA Rank"] = np.nan
 
     mining_df = pd.DataFrame()
     mining_df["Search Terms"] = df_mining.iloc[:, 0]
     mining_df["Search Volume"] = df_mining.iloc[:, 5]
-    mining_df["ASIN Click Share"] = [None] * len(df_mining)
-    mining_df["Comp Click Share"] = [None] * len(df_mining)
+    mining_df["ASIN Click Share"] = np.nan
+    mining_df["Comp Click Share"] = np.nan
     mining_df["Niche Click Share"] = df_mining.iloc[:, 15]
-    mining_df["Comp Depth"] = [None] * len(df_mining)
+    mining_df["Comp Depth"] = np.nan
     mining_df["Niche Depth"] = df_mining.iloc[:, 12]
     mining_df["Relevancy"] = df_mining.iloc[:, 2]
     mining_df["Fuente"] = "MiningKW"
-    mining_df["ABA Rank"] = [None] * len(df_mining)
+    mining_df["ABA Rank"] = np.nan
 
     master_raw = pd.concat([cust_df, comp_df, mining_df],
                            axis=0, ignore_index=True)
