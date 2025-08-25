@@ -2,6 +2,7 @@
 from scipy.stats import skew, kurtosis
 import streamlit as st
 import pandas as pd
+import numpy as np
 
 
 def imputar_valores_vacios(df: pd.DataFrame) -> pd.DataFrame:
@@ -183,3 +184,25 @@ def sugerir_log_transform(df: pd.DataFrame) -> dict:
         sugerencias[col] = valor_skew if abs(valor_skew) > 1 else None
 
     return sugerencias
+
+
+def aplicar_log10_dinamico(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Aplica log10 dinámicamente a las columnas marcadas como 'Aplicar log10' por el usuario.
+    - Preserva los valores -1 y -2.
+    - Renombra la columna visualmente: 'Search Volume (log10)'
+    """
+    df = df.copy()
+    nuevas_columnas = {}
+
+    for col in df.select_dtypes(include="number").columns:
+        key = f"log_radio_{col}"
+        if key in st.session_state and st.session_state[key] == "Aplicar log10":
+            serie = df[col]
+            transformada = serie.apply(lambda x: np.log10(x) if x > 0 else x)
+            nuevo_nombre = f"{col} (log10)"
+            nuevas_columnas[col] = nuevo_nombre
+            df[col] = transformada
+
+    df.rename(columns=nuevas_columnas, inplace=True)
+    return df
