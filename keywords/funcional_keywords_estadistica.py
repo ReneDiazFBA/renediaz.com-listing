@@ -57,7 +57,8 @@ def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
         if col_validos.empty:
             continue
 
-        min_val = 0.0
+        # 🔧 FIX: usamos el valor mínimo real positivo
+        min_val = float(col_validos.min())
         max_val = float(col_validos.max())
         step = 0.001 if "Click Share" in col else 1.0
 
@@ -76,24 +77,22 @@ def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
             key=f"slider_{col}"
         )
 
-        # Filtro individual por columna
         filtro_col = (
-            (col_data == -2) |                      # incluir -2 siempre
-            (col_data.between(rango[0], rango[1]))  # dentro del rango
+            (col_data == -2) |
+            (col_data.between(rango[0], rango[1]))
         )
 
         if not excluir_faltantes:
-            filtro_col |= (col_data == -1)  # incluir -1 si checkbox desmarcado
+            filtro_col |= (col_data == -1)
 
         filtros.append(filtro_col)
 
-    # Aplicar intersección de todos los filtros acumulados
     if filtros:
         filtro_total = filtros[0]
         for f in filtros[1:]:
             filtro_total &= f
         df_filtrado = df_filtrado[filtro_total]
     else:
-        return df  # <-- FIX agregado para evitar None
+        return df
 
     return df_filtrado
