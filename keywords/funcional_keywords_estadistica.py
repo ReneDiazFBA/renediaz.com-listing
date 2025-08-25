@@ -1,4 +1,5 @@
 # keywords/funcional_keywords_estadistica.py
+from scipy.stats import ttest_ind
 from scipy.stats import skew, kurtosis, shapiro
 import streamlit as st
 import pandas as pd
@@ -271,3 +272,39 @@ def interpretar_correlaciones(matriz: pd.DataFrame, metodo: str = "Pearson") -> 
             interpretaciones.append(interpretacion)
 
     return interpretaciones
+
+
+def realizar_t_tests(df: pd.DataFrame) -> list:
+    """
+    Realiza T-Tests para comparar métricas entre grupos altos y bajos.
+    Divide cada columna en top 25% y bottom 25% y compara.
+    """
+    resultados = []
+    columnas_numericas = df.select_dtypes(include=["number"]).columns.tolist()
+
+    for col in columnas_numericas:
+        serie = df[col]
+        serie_valida = serie[(serie != -1) & (serie != -2)]
+
+        if len(serie_valida) < 10:
+            continue
+
+        q1 = serie_valida.quantile(0.25)
+        q3 = serie_valida.quantile(0.75)
+
+        grupo_bajo = serie_valida[serie_valida <= q1]
+        grupo_alto = serie_valida[serie_valida >= q3]
+
+        if len(grupo_bajo) < 3 or len(grupo_alto) < 3:
+            continue
+
+        stat, pvalue = ttest_ind(grupo_bajo, grupo_alto, equal_var=False)
+
+        if pvalue < 0.05:
+            interpretacion = f"Diferencia significativa en **{col}** (p = {pvalue:.4f})."
+        else:
+            interpretacion = f"No hay diferencia significativa en **{col}** (p = {pvalue:.4f})."
+
+        resultados.append(interpretacion)
+
+    return resultados

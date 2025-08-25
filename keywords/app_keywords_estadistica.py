@@ -18,6 +18,7 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
         "descriptiva": ("Descriptiva", "descriptiva"),
         "graficos": ("Gráficos", "graficos"),
         "correlaciones": ("Correlaciones", "correlaciones"),
+        "inferencia": ("Inferencia", "inferencia"),
         "ia": ("Análisis IA", "ia"),
     }
 
@@ -194,6 +195,29 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
 
         for linea in interpretaciones_pearson + interpretaciones_spearman:
             st.markdown(f"- {linea}")
+
+    elif active == "inferencia":
+        st.subheader("Inferencia Estadística")
+
+        from keywords.funcional_keywords_estadistica import (
+            filtrar_por_sliders,
+            aplicar_log10_dinamico,
+            realizar_t_tests,
+        )
+
+        df_original = st.session_state.master_deduped.copy()
+        df_filtrado = filtrar_por_sliders(df_original)
+        df_transformado = aplicar_log10_dinamico(df_filtrado)
+
+        st.markdown("### Comparación de métricas con T-Test")
+
+        resultados = realizar_t_tests(df_transformado)
+
+        if not resultados:
+            st.info("No hay suficientes datos para realizar inferencia.")
+        else:
+            for item in resultados:
+                st.markdown(f"- {item}")
 
     elif active == "ia":
         st.subheader("Análisis con IA")
