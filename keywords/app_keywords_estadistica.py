@@ -196,28 +196,30 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
         for linea in interpretaciones_pearson + interpretaciones_spearman:
             st.markdown(f"- {linea}")
 
-    elif active == "inferencia":
-        st.subheader("Inferencia Estadística")
+    elif active == "inferencial":
+        st.subheader("Análisis Inferencial")
 
         from keywords.funcional_keywords_estadistica import (
             filtrar_por_sliders,
             aplicar_log10_dinamico,
-            realizar_t_tests,
+            realizar_tests_inferenciales
         )
 
         df_original = st.session_state.master_deduped.copy()
         df_filtrado = filtrar_por_sliders(df_original)
         df_transformado = aplicar_log10_dinamico(df_filtrado)
 
-        st.markdown("### Comparación de métricas con T-Test")
+        resultados = realizar_tests_inferenciales(df_transformado)
 
-        resultados = realizar_t_tests(df_transformado)
+        st.subheader("Comparación de métricas con pruebas inferenciales")
+        st.caption(
+            "Compara el cuartil inferior vs superior para detectar si existen diferencias estadísticamente significativas.")
 
-        if not resultados:
-            st.info("No hay suficientes datos para realizar inferencia.")
+        if resultados:
+            for linea in resultados:
+                st.markdown(f"- {linea}")
         else:
-            for item in resultados:
-                st.markdown(f"- {item}")
+            st.info("No se detectaron diferencias estadísticamente significativas.")
 
     elif active == "ia":
         st.subheader("Análisis con IA")

@@ -1,6 +1,6 @@
 # keywords/funcional_keywords_estadistica.py
 from scipy.stats import ttest_ind
-from scipy.stats import skew, kurtosis, shapiro
+from scipy.stats import skew, kurtosis, shapiro, ttest_ind, mannwhitneyu, levene
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -274,37 +274,55 @@ def interpretar_correlaciones(matriz: pd.DataFrame, metodo: str = "Pearson") -> 
     return interpretaciones
 
 
-def realizar_t_tests(df: pd.DataFrame) -> list:
+def realizar_tests_inferenciales(df: pd.DataFrame) -> list:
     """
-    Realiza T-Tests para comparar métricas entre grupos altos y bajos.
-    Divide cada columna en top 25% y bottom 25% y compara.
+    Realiza pruebas inferenciales para comparar métricas entre grupos altos y bajos.
+    - Aplica Shapiro-Wilk para verificar normalidad.
+    - Usa T-Test si ambas muestras son normales, de lo contrario Mann-Whitney U.
+    - Aplica Test de Levene para verificar homogeneidad de varianzas.
     """
     resultados = []
-    columnas_numericas = df.select_dtypes(include=["number"]).columns.tolist()
+    columnas_numericas = df.select_dtypes(include=["number"]).columns
 
     for col in columnas_numericas:
-        serie = df[col]
-        serie_valida = serie[(serie != -1) & (serie != -2)]
+        datos = df[col].copy()
+        datos = datos[(datos != -1) & (datos != -2)]
 
-        if len(serie_valida) < 10:
+        if len(datos) < 10:
             continue
 
-        q1 = serie_valida.quantile(0.25)
-        q3 = serie_valida.quantile(0.75)
+        q25 = datos.quantile(0.25)
+        q75 = datos.quantile(0.75)
 
-        grupo_bajo = serie_valida[serie_valida <= q1]
-        grupo_alto = serie_valida[serie_valida >= q3]
+        grupo_bajo = datos[datos <= q25]
+        grupo_alto = datos[datos >= q75]
 
-        if len(grupo_bajo) < 3 or len(grupo_alto) < 3:
+        if len(grupo_bajo) < 5 or len(grupo_alto) < 5:
             continue
 
-        stat, pvalue = ttest_ind(grupo_bajo, grupo_alto, equal_var=False)
+        # Shapiro para ambos grupos
+        normal_bajo = shapiro(grupo_bajo).pvalue > 0.05
+        normal_alto = shapiro(grupo_alto).pvalue > 0.05
 
-        if pvalue < 0.05:
-            interpretacion = f"Diferencia significativa en **{col}** (p = {pvalue:.4f})."
+        # Levene: igualdad de varianzas
+        try:
+            p_levene = levene(grupo_bajo, grupo_alto).pvalue
+        except Exception:
+            p_levene = None
+
+        # T-Test o Mann-Whitney
+        if normal_bajo and normal_alto:
+            p = ttest_ind(grupo_bajo, grupo_alto, equal_var=True).pvalue
+            test = "T-Test"
         else:
-            interpretacion = f"No hay diferencia significativa en **{col}** (p = {pvalue:.4f})."
+            p = mannwhitneyu(grupo_bajo, grupo_alto,
+                             alternative="two-sided").pvalue
+            test = "Mann-Whitney U"
 
-        resultados.append(interpretacion)
+        if p < 0.05:
+            resultados.append(
+                f"Diferencia significativa en **{col}** ({test}, p = {p:.4f}, Levene p = {p_levene:.4f} {'✅' if p_levene and p_levene > 0.05 else '⚠️'})"
+            )
 
     return resultados
+
