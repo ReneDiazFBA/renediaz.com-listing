@@ -33,9 +33,9 @@ def imputar_valores_vacios(df: pd.DataFrame) -> pd.DataFrame:
 def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
     """
     Aplica filtros tipo slider para columnas numéricas.
-    - Los -2 (no aplica) siempre se muestran, nunca se filtran.
-    - Los -1 (faltantes reales) siempre se muestran, pero solo se filtran si el checkbox está activado.
-    - El slider aplica solo sobre valores >= 0.
+    - -2 siempre se muestra.
+    - -1 se filtra solo si el checkbox está activado.
+    - Slider aplica solo sobre valores >= 0.
     """
     df = imputar_valores_vacios(df)
     df_filtrado = df.copy()
@@ -51,7 +51,6 @@ def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
     for col in columnas_numericas:
         col_data = df_filtrado[col]
 
-        # Solo valores >= 0 para definir el rango de slider
         col_validos = col_data[col_data >= 0]
         if col_validos.empty:
             continue
@@ -60,8 +59,8 @@ def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
         max_val = float(col_validos.max())
         step = 0.01 if "Click Share" in col else 1.0
 
-        incluir_faltantes = st.checkbox(
-            f"Incluir registros con valor faltante en '{col}' (-1) en el filtro",
+        excluir_faltantes = st.checkbox(
+            f"Excluir registros con valor faltante en '{col}' (-1)",
             value=False,
             key=f"check_{col}"
         )
@@ -75,15 +74,16 @@ def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
             key=f"slider_{col}"
         )
 
-        # Construir filtro
+        # Registros que cumplen alguna de estas condiciones:
         filtro = (
-            (col_data == -2) |  # siempre incluir -2
-            (col_data == -1) |  # siempre incluir -1
-            (col_data.between(rango[0], rango[1]))  # aplicar rango
+            (col_data == -2) |                         # siempre incluir -2
+            # valores dentro del rango
+            (col_data.between(rango[0], rango[1]))
         )
 
-        if incluir_faltantes:
-            filtro |= (col_data == -1)  # redundante pero explícito
+        if not excluir_faltantes:
+            # incluir -1 si checkbox está desmarcado
+            filtro |= (col_data == -1)
 
         df_filtrado = df_filtrado[filtro]
 
