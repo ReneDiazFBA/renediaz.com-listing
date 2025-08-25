@@ -1,4 +1,4 @@
-##app_keywords_estadistica.py
+# app_keywords_estadistica.py
 import streamlit as st
 import pandas as pd
 from typing import Optional
@@ -31,8 +31,15 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
             st.error(
                 "No se ha cargado la tabla deduplicada. Sube un archivo Excel en la sección Datos.")
         else:
-            df = st.session_state.master_deduped.copy()
-            st.dataframe(df, use_container_width=True)
+            from keywords.funcional_keywords_estadistica import filtrar_por_sliders
+            from keywords.funcional_keywords_deduplicado import formatear_columnas_tabla
+
+            df_original = st.session_state.master_deduped.copy()
+            df_filtrado = filtrar_por_sliders(df_original)
+            df_formateado = formatear_columnas_tabla(df_filtrado)
+
+            st.markdown(f"**Total Registros: {len(df_filtrado):,}**")
+            st.dataframe(df_formateado, use_container_width=True)
 
     elif active == "graficos":
         st.subheader("Gráficos")
