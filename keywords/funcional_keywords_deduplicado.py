@@ -19,18 +19,20 @@ def build_master_raw(excel_data: pd.ExcelFile) -> pd.DataFrame:
         st.error(f"Error al leer hojas del Excel: {e}")
         return pd.DataFrame()
 
-    def col(df, index, applies=True):
-        if applies:
-            return df.iloc[:, index]
-        else:
-            return np.nan  # Visualiza como NaN, útil para cálculo
+    def col(df, index, applies=True, numeric=False):
+        if not applies:
+            return np.nan
+        serie = df.iloc[:, index]
+        if numeric:
+            return pd.to_numeric(serie, errors="coerce")
+        return serie
 
     # === CustKW ===
     cust = pd.DataFrame()
     cust["Search Terms"] = col(df_cust, 0)
-    cust["Search Volume"] = col(df_cust, 15)
-    cust["ASIN Click Share"] = col(df_cust, 1)
-    cust["ABA Rank"] = col(df_cust, 14)
+    cust["Search Volume"] = col(df_cust, 15, numeric=True)
+    cust["ASIN Click Share"] = col(df_cust, 1, numeric=True)
+    cust["ABA Rank"] = col(df_cust, 14, numeric=True)
     cust["Fuente"] = "CustKW"
     cust["Comp Click Share"] = np.nan
     cust["Comp Depth"] = np.nan
@@ -41,12 +43,12 @@ def build_master_raw(excel_data: pd.ExcelFile) -> pd.DataFrame:
     # === CompKW ===
     comp = pd.DataFrame()
     comp["Search Terms"] = col(df_comp, 0)
-    comp["Search Volume"] = col(df_comp, 8)
+    comp["Search Volume"] = col(df_comp, 8, numeric=True)
     comp["ASIN Click Share"] = np.nan
-    comp["ABA Rank"] = col(df_comp, 7)  # ABA Rank en col H
+    comp["ABA Rank"] = col(df_comp, 7, numeric=True)
     comp["Fuente"] = "CompKW"
-    comp["Comp Click Share"] = col(df_comp, 2)
-    comp["Comp Depth"] = col(df_comp, 5)
+    comp["Comp Click Share"] = col(df_comp, 2, numeric=True)
+    comp["Comp Depth"] = col(df_comp, 5, numeric=True)
     comp["Niche Click Share"] = np.nan
     comp["Niche Depth"] = np.nan
     comp["Relevancy"] = np.nan
@@ -54,15 +56,15 @@ def build_master_raw(excel_data: pd.ExcelFile) -> pd.DataFrame:
     # === MiningKW ===
     mining = pd.DataFrame()
     mining["Search Terms"] = col(df_mining, 0)
-    mining["Search Volume"] = col(df_mining, 5)
+    mining["Search Volume"] = col(df_mining, 5, numeric=True)
     mining["ASIN Click Share"] = np.nan
     mining["ABA Rank"] = np.nan
     mining["Fuente"] = "MiningKW"
     mining["Comp Click Share"] = np.nan
     mining["Comp Depth"] = np.nan
-    mining["Niche Click Share"] = col(df_mining, 15)
-    mining["Niche Depth"] = col(df_mining, 12)
-    mining["Relevancy"] = col(df_mining, 2)
+    mining["Niche Click Share"] = col(df_mining, 15, numeric=True)
+    mining["Niche Depth"] = col(df_mining, 12, numeric=True)
+    mining["Relevancy"] = col(df_mining, 2, numeric=True)
 
     # Unir todo
     df_raw = pd.concat([cust, comp, mining], ignore_index=True)
@@ -73,8 +75,8 @@ def build_master_raw(excel_data: pd.ExcelFile) -> pd.DataFrame:
     # Truncar Click Shares a 2 decimales
     for colname in ["ASIN Click Share", "Comp Click Share", "Niche Click Share"]:
         if colname in df_raw.columns:
-            df_raw[colname] = pd.to_numeric(df_raw[colname], errors="coerce")
             df_raw[colname] = (df_raw[colname] * 100).apply(
-                lambda x: np.floor(x * 100) / 100 if pd.notnull(x) else np.nan)
+                lambda x: np.floor(x * 100) / 100 if pd.notnull(x) else np.nan
+            )
 
     return df_raw
