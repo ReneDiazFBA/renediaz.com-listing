@@ -31,15 +31,15 @@ def imputar_valores_vacios(df: pd.DataFrame) -> pd.DataFrame:
 
 def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Dado un DataFrame, aplica filtros tipo slider para cada columna numérica.
-    Devuelve el DataFrame filtrado dinámicamente.
+    Aplica filtros tipo slider para columnas numéricas.
+    - Elimina -2 (no aplica) solo si el slider se modifica o el checkbox se activa.
+    - Si no se toca nada, se muestran todos los registros.
     """
     df = imputar_valores_vacios(df)
     df_filtrado = df.copy()
 
     columnas_numericas = df_filtrado.select_dtypes(
         include=["number"]).columns.tolist()
-
     if not columnas_numericas:
         st.info("No hay columnas numéricas para filtrar.")
         return df_filtrado
@@ -47,14 +47,28 @@ def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
     st.markdown("### Filtros dinámicos")
 
     for col in columnas_numericas:
-        # Excluir filas con -2 (irrelevante) antes de calcular min/max
-        df_col = df_filtrado[df_filtrado[col] != -2]
+        col_data = df_filtrado[col]
+
+        # Solo para valores válidos (excluyendo -2), para sugerir el rango del slider
+        col_validos = col_data[col_data != -2]
+
+        if col_validos.empty:
+            continue
 
         min_val = 0.0
-        max_val = float(df_col[col].max())
-
+        max_val = float(col_validos.max())
         step = 0.01 if "Click Share" in col else 1.0
 
+        # Mostrar checkbox solo si hay -1 presentes
+        mostrar_sin_valor = False
+        if -1 in col_validos.values:
+            mostrar_sin_valor = st.checkbox(
+                f"Incluir registros con valor faltante en '{col}' (-1)",
+                value=True,
+                key=f"check_{col}"
+            )
+
+        # Mostrar el slider
         rango = st.slider(
             f"{col}:",
             min_value=min_val,
@@ -64,18 +78,10 @@ def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
             key=f"slider_{col}"
         )
 
-        incluir_faltantes = st.checkbox(
-            f"Incluir valores faltantes (-1) en {col}",
-            value=True,
-            key=f"chk_{col}"
-        )
+        # Aplicar filtro solo si el rango es más restrictivo o el checkbox fue modificado
+        filtro = (col_data == -1) if mostrar_sin_valor else (col_data >= 0)
 
-        # Aplicar filtros dinámicos
-        cond_rango = df_filtrado[col].between(rango[0], rango[1])
-        cond_faltantes = (df_filtrado[col] == -
-                          1) if incluir_faltantes else False
-        cond_validos = (df_filtrado[col] != -2)
-
-        df_filtrado = df_filtrado[cond_validos & (cond_rango | cond_faltantes)]
+        filtro = filtro & col_data.between(rango[0], rango[1])
+        df_filtrado = df_filtrado[filtro]
 
     return df_filtrado
