@@ -33,8 +33,9 @@ def imputar_valores_vacios(df: pd.DataFrame) -> pd.DataFrame:
 def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
     """
     Aplica filtros tipo slider para columnas numéricas.
-    - Excluye -2 (no aplica) siempre.
-    - -1 (faltantes reales) se incluyen solo si el usuario activa el checkbox.
+    - Los -2 (no aplica) siempre se muestran, nunca se filtran.
+    - Los -1 (faltantes reales) siempre se muestran, pero solo se filtran si el checkbox está activado.
+    - El slider aplica solo sobre valores >= 0.
     """
     df = imputar_valores_vacios(df)
     df_filtrado = df.copy()
@@ -50,22 +51,20 @@ def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
     for col in columnas_numericas:
         col_data = df_filtrado[col]
 
-        # Excluir -2 (no aplica)
-        col_validos = col_data[col_data != -2]
+        # Solo valores >= 0 para definir el rango de slider
+        col_validos = col_data[col_data >= 0]
         if col_validos.empty:
             continue
 
         min_val = 0.0
-        max_val = float(col_validos[col_validos >= 0].max())
+        max_val = float(col_validos.max())
         step = 0.01 if "Click Share" in col else 1.0
 
-        incluir_faltantes = False
-        if -1 in col_data.values:
-            incluir_faltantes = st.checkbox(
-                f"Incluir registros con valor faltante en '{col}' (-1)",
-                value=True,
-                key=f"check_{col}"
-            )
+        incluir_faltantes = st.checkbox(
+            f"Incluir registros con valor faltante en '{col}' (-1) en el filtro",
+            value=False,
+            key=f"check_{col}"
+        )
 
         rango = st.slider(
             f"{col}:",
@@ -76,11 +75,15 @@ def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
             key=f"slider_{col}"
         )
 
-        filtro = col_data != -2
+        # Construir filtro
+        filtro = (
+            (col_data == -2) |  # siempre incluir -2
+            (col_data == -1) |  # siempre incluir -1
+            (col_data.between(rango[0], rango[1]))  # aplicar rango
+        )
+
         if incluir_faltantes:
-            filtro &= (col_data.between(rango[0], rango[1]) | (col_data == -1))
-        else:
-            filtro &= col_data.between(rango[0], rango[1])
+            filtro |= (col_data == -1)  # redundante pero explícito
 
         df_filtrado = df_filtrado[filtro]
 
