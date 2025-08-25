@@ -42,8 +42,8 @@ if seccion_principal == "Datos":
     mostrar_carga_excel()
 
     try:
-        from keywords.loader_deduplicados import cargar_deduplicados
         if "excel_data" in st.session_state and st.session_state.excel_data is not None:
+            from keywords.loader_deduplicados import cargar_deduplicados
             cargar_deduplicados(st.session_state.excel_data)
     except ModuleNotFoundError:
         st.warning("Módulo 'loader_deduplicados' no disponible todavía.")
