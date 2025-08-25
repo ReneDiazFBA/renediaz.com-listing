@@ -48,6 +48,19 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
             df_descriptivos = calcular_descriptivos_extendidos(df_filtrado)
             st.dataframe(df_descriptivos, use_container_width=True)
 
+            # === SUGERENCIA DE LOG10 (basado en skewness)
+            from keywords.funcional_keywords_estadistica import sugerir_log_transform
+            st.subheader("Sugerencia de Transformación Logarítmica")
+            sugerencias = sugerir_log_transform(df_filtrado)
+            for col, valor_skew in sugerencias.items():
+                if valor_skew is not None:
+                    st.radio(
+                        f"Columna '{col}' — skewness: {valor_skew:.2f}. ¿Aplicar log10?",
+                        options=["Mantener original", "Aplicar log10"],
+                        index=0,
+                        key=f"log_radio_{col}"
+                    )
+
     elif active == "graficos":
         st.subheader("Gráficos")
         st.info(
