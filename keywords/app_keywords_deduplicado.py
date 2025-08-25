@@ -1,44 +1,22 @@
-# keywords/app_keywords_data.py
-
+# keywords/app_keywords_deduplicado.py
 import streamlit as st
 import pandas as pd
 from typing import Optional
 
-from keywords.app_keywords_referencial import mostrar_tabla_referencial
-from keywords.app_keywords_competidores import mostrar_tabla_competidores
-from keywords.app_keywords_mining import mostrar_tabla_mining
-
-# Este import es condicional (solo si el archivo existe con la función)
-try:
-    from keywords.app_keywords_deduplicado import mostrar_keywords_deduplicado
-    _DEDUP_OK = True
-except ImportError:
-    _DEDUP_OK = False
-
-from utils.nav_utils import render_subnav
+from keywords.funcional_keywords_deduplicado import construir_tabla_maestra_raw
 
 
-def mostrar_keywords_data(excel_data: Optional[pd.ExcelFile] = None):
-    st.markdown("### Keywords — Tablas de origen")
+def mostrar_keywords_deduplicado(excel_data: Optional[pd.ExcelFile] = None):
+    st.markdown("### Vista: Maestra Raw")
+    st.caption(
+        "Unión completa de todas las fuentes (CustKW, CompKW, MiningKW) sin deduplicar.")
 
-    secciones = {
-        "referencial": ("Reverse ASIN Referencial", "CustKW"),
-        "competidores": ("Reverse ASIN Competidores", "CompKW"),
-        "mining": ("Mining de Keywords", "MiningKW"),
-        "deduplicado": ("Maestra deduplicada", None)
-    }
+    if excel_data is None:
+        st.warning("Primero debes subir un archivo en la sección Datos.")
+        return
 
-    active = render_subnav("referencial", secciones)
-    st.divider()
-
-    if active == "referencial":
-        mostrar_tabla_referencial(excel_data, sheet_name="CustKW")
-    elif active == "competidores":
-        mostrar_tabla_competidores(excel_data, sheet_name="CompKW")
-    elif active == "mining":
-        mostrar_tabla_mining(excel_data, sheet_name="MiningKW")
-    elif active == "deduplicado":
-        if _DEDUP_OK:
-            mostrar_keywords_deduplicado(excel_data)
-        else:
-            st.error("Vista deduplicada aún no implementada o con errores.")
+    try:
+        df_raw = construir_tabla_maestra_raw(excel_data)
+        st.dataframe(df_raw.head(100), use_container_width=True)
+    except Exception as e:
+        st.error(f"Error al construir la tabla maestra raw: {e}")
