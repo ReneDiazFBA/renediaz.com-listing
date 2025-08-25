@@ -197,7 +197,7 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
             st.markdown(f"- {linea}")
 
     elif active == "inferencial":
-        st.subheader("🔬 Análisis Inferencial")
+        st.subheader("Análisis Inferencial")
 
         from keywords.funcional_keywords_estadistica import (
             filtrar_por_sliders,
