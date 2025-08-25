@@ -36,7 +36,7 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
 
             df_original = st.session_state.master_deduped.copy()
             df_filtrado = filtrar_por_sliders(df_original)
-            df_formateado = formatear_columnas_tabla(df_filtrado)
+            df_formateado = df_filtrado
 
             st.markdown(f"**Total Registros: {len(df_filtrado):,}**")
             st.dataframe(df_formateado, use_container_width=True)
