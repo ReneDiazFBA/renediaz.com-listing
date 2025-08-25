@@ -41,10 +41,12 @@ if seccion_principal == "Datos":
     from datos.app_datos_upload import mostrar_carga_excel
     mostrar_carga_excel()
 
-    from keywords.loader_deduplicados import cargar_deduplicados
-
-    if "excel_data" in st.session_state and st.session_state.excel_data is not None:
-        cargar_deduplicados(st.session_state.excel_data)
+    try:
+        from keywords.loader_deduplicados import cargar_deduplicados
+        if "excel_data" in st.session_state and st.session_state.excel_data is not None:
+            cargar_deduplicados(st.session_state.excel_data)
+    except ModuleNotFoundError:
+        st.warning("Módulo 'loader_deduplicados' no disponible todavía.")
 
 
 elif seccion_principal == "Keywords":
