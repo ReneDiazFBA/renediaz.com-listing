@@ -24,7 +24,16 @@ def imputar_valores_vacios(df: pd.DataFrame) -> pd.DataFrame:
 
     for col in todas_columnas:
         if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
+            # Elimina %, comas y convierte a número
+            df[col] = (
+                df[col]
+                .astype(str)
+                .str.replace("%", "", regex=False)
+                .str.replace(",", "", regex=False)
+                .replace("NAF", pd.NA)
+                .replace("None", pd.NA)
+            )
+            df[col] = pd.to_numeric(df[col], errors="coerce")
 
     columnas_numericas = df.select_dtypes(include=["number"]).columns
 
