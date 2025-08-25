@@ -25,8 +25,13 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
 
     if active == "descriptiva":
         st.subheader("Vista Descriptiva")
-        st.info(
-            "Aquí se mostrará la tabla con estadísticos básicos. [Placeholder]")
+
+        if "master_deduped" not in st.session_state:
+            st.error(
+                "No se ha cargado la tabla deduplicada. Sube un archivo Excel en la sección Datos.")
+        else:
+            df = st.session_state.master_deduped.copy()
+            st.dataframe(df, use_container_width=True)
 
     elif active == "graficos":
         st.subheader("Gráficos")
