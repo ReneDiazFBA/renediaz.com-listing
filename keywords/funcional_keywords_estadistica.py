@@ -48,6 +48,8 @@ def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
 
     st.markdown("### Filtros dinámicos")
 
+    filtros = []  # lista para almacenar condiciones por columna
+
     for col in columnas_numericas:
         col_data = df_filtrado[col]
 
@@ -74,16 +76,20 @@ def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
             key=f"slider_{col}"
         )
 
-        # Registros que cumplen todas estas condiciones:
-        filtro = (
+        # Filtro individual por columna
+        filtro_col = (
             (col_data == -2) |                      # incluir -2 siempre
             (col_data.between(rango[0], rango[1]))  # dentro del rango
         )
 
         if not excluir_faltantes:
-            # incluir -1 si checkbox está desmarcado
-            filtro |= (col_data == -1)
+            filtro_col |= (col_data == -1)  # incluir -1 si checkbox desmarcado
 
-        df_filtrado = df_filtrado[filtro]
+        filtros.append(filtro_col)
 
-    return df_filtrado
+    # Aplicar intersección de todos los filtros acumulados
+    if filtros:
+        filtro_total = filtros[0]
+        for f in filtros[1:]:
+            filtro_total &= f
+        df_filtrado = df_filtrado[filtro_total]
