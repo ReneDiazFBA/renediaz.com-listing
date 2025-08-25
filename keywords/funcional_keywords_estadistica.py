@@ -93,3 +93,7 @@ def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
         for f in filtros[1:]:
             filtro_total &= f
         df_filtrado = df_filtrado[filtro_total]
+    else:
+        return df  # <-- FIX agregado para evitar None
+
+    return df_filtrado
