@@ -121,7 +121,7 @@ def formatear_columnas_tabla(df: pd.DataFrame) -> pd.DataFrame:
                 ]:
                     return "NAF"
                 else:
-                    return "nan" 
+                    return "NaN"
 
             else:
                 if col in ["Search Volume", "ABA Rank", "Comp Depth", "Niche Depth", "Relevancy"]:
