@@ -53,8 +53,8 @@ elif seccion_principal == "Keywords":
     mostrar_keywords_data(st.session_state.excel_data)
 
 elif seccion_principal == "Mercado":
-    st.title("Módulo: Mercado")
-    st.info("Aquí irá el análisis de reviews. [Placeholder]")
+    from mercado.app_mercado_analisis import mostrar_analisis_mercado
+    mostrar_analisis_mercado(st.session_state.excel_data)
 
 elif seccion_principal == "Listing":
     st.title("Módulo: Listing")
