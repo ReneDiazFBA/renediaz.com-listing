@@ -126,23 +126,20 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
             resultados = st.session_state.get("resultados_mercado", {})
             atributos_raw = resultados.get("tokens_diferenciadores", "")
 
-            # DEBUG: Si no hay tokens IA, usar tokens ficticios para pruebas
             if not atributos_raw:
                 st.warning("No se encontraron tokens de IA. Se usarán tokens de prueba para depurar.")
                 atributos_raw = """
-                Lightweight
-                Waterproof
-                Flimsy
-                Durable
-                Multipurpose
-                Private
-                Perfect for Sporting Events
+                color
+                tamaño
+                madera
+                almacenamiento
+                portabilidad
+                materiales no tóxicos
                 """
 
-            # Convertir a lista limpia
             atributos_mercado = [
                 x.strip().lower()
-                for x in atributos_raw.split("\n") if x.strip()
+                for x in atributos_raw.strip().split("\n") if x.strip()
             ]
 
             from mercado.funcional_mercado_contraste import comparar_atributos_mercado_cliente
@@ -151,15 +148,34 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                 excel_data, atributos_mercado
             )
 
-            if resultados_contraste is None or all(
-                len(v) == 0 for v in resultados_contraste.values()
-            ):
-                st.warning("No se encontraron atributos relevantes para comparar.")
+            st.markdown(f"Columnas detectadas: {len(resultados_contraste) if hasattr(resultados_contraste, '__len__') else 'N/A'}")
+
+            # Validar si hay datos útiles (protección robusta)
+            hay_datos_utiles = False
+            for k, v in resultados_contraste.items():
+                try:
+                    if isinstance(v, (list, tuple, set, dict, pd.Series, np.ndarray)):
+                        if len(v) > 0:
+                            hay_datos_utiles = True
+                    elif isinstance(v, str):
+                        if v.strip() != "":
+                            hay_datos_utiles = True
+                    else:
+                        if v:
+                            hay_datos_utiles = True
+                except Exception as e:
+                    st.error(f"Error al validar contenido de '{k}': {e}")
+                    continue
+
+            if not hay_datos_utiles:
+                st.warning("No se encontraron atributos relevantes en CustData.")
+                st.caption("Debug:")
+                st.json(resultados_contraste)
             else:
                 st.markdown("#### Atributos valorados por el mercado pero ausentes en el cliente")
-                for a in resultados_contraste["Atributos valorados por el mercado pero no presentes en cliente"]:
-                    st.markdown(f"- **{a}**")
+                for a in resultados_contraste.get("Atributos valorados por el mercado pero no presentes en cliente", []):
+                    st.markdown(f"- ❗️**{a}**")
 
                 st.markdown("#### Atributos declarados por cliente pero ignorados por el mercado")
-                for a in resultados_contraste["Atributos declarados por cliente pero ignorados por el mercado"]:
-                    st.markdown(f"- **{a}**")
+                for a in resultados_contraste.get("Atributos declarados por cliente pero ignorados por el mercado", []):
+                    st.markdown(f"- ℹ️ **{a}**")
