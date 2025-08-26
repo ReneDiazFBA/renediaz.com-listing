@@ -123,28 +123,23 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
         if excel_data is None:
             st.warning("Primero debes subir un archivo Excel en la sección Datos.")
         else:
-            # Cargar tokens diferenciadores, o insertar ejemplo si aún no hay IA
-            if "resultados_mercado" not in st.session_state:
-                st.session_state["resultados_mercado"] = {}
+            resultados = st.session_state.get("resultados_mercado", {})
+            atributos_raw = resultados.get("tokens_diferenciadores", "")
 
-            if not st.session_state["resultados_mercado"].get("tokens_diferenciadores"):
+            # DEBUG: Si no hay tokens IA, usar tokens ficticios para pruebas
+            if not atributos_raw:
                 st.warning("No se encontraron tokens de IA. Se usarán tokens de prueba para depurar.")
-                st.session_state["resultados_mercado"]["tokens_diferenciadores"] = """
-                wooden
-                magnetic
-                non-toxic
-                portable
-                group play
-                educational
-                colorful
-                montessori
-                storage case
-                lightweight
+                atributos_raw = """
+                Lightweight
+                Waterproof
+                Flimsy
+                Durable
+                Multipurpose
+                Private
+                Perfect for Sporting Events
                 """
 
-            resultados = st.session_state["resultados_mercado"]
-            atributos_raw = resultados["tokens_diferenciadores"]
-
+            # Convertir a lista limpia
             atributos_mercado = [
                 x.strip().lower()
                 for x in atributos_raw.split("\n") if x.strip()
@@ -156,15 +151,15 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                 excel_data, atributos_mercado
             )
 
-            if resultados_contraste is None or not any(
-                bool(v) for v in resultados_contraste.values()
+            if resultados_contraste is None or all(
+                len(v) == 0 for v in resultados_contraste.values()
             ):
                 st.warning("No se encontraron atributos relevantes para comparar.")
             else:
                 st.markdown("#### Atributos valorados por el mercado pero ausentes en el cliente")
                 for a in resultados_contraste["Atributos valorados por el mercado pero no presentes en cliente"]:
-                    st.markdown(f"- ❗️**{a}**")
+                    st.markdown(f"- **{a}**")
 
                 st.markdown("#### Atributos declarados por cliente pero ignorados por el mercado")
                 for a in resultados_contraste["Atributos declarados por cliente pero ignorados por el mercado"]:
-                    st.markdown(f"- ℹ️ **{a}**")
+                    st.markdown(f"- **{a}**")
