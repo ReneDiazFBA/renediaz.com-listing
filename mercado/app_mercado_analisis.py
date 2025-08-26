@@ -142,17 +142,25 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                     excel_data, atributos_mercado
                 )
 
-                if resultados_contraste is None or not any(resultados_contraste.values):
+                # Debug visual completo
+                st.caption("🔍 Debug de resultados_contraste:")
+                for k, v in resultados_contraste.items():
+                    st.markdown(f"**{k}** → {len(v)} items")
+
+                if (
+                    resultados_contraste is None or
+                    not any(isinstance(v, (list, tuple, set)) and len(v) > 0
+                            for v in resultados_contraste.values())
+                ):
                     st.warning(
                         "No se encontraron atributos relevantes en CustData.")
                 else:
-
                     st.markdown(
                         "#### Atributos valorados por el mercado pero ausentes en el cliente")
-                    for a in resultados_contraste["Atributos valorados por el mercado pero no presentes en cliente"]:
+                    for a in resultados_contraste.get("Atributos valorados por el mercado pero no presentes en cliente", []):
                         st.markdown(f"- ❗️**{a}**")
 
                     st.markdown(
                         "#### Atributos declarados por cliente pero ignorados por el mercado")
-                    for a in resultados_contraste["Atributos declarados por cliente pero ignorados por el mercado"]:
+                    for a in resultados_contraste.get("Atributos declarados por cliente pero ignorados por el mercado", []):
                         st.markdown(f"- ℹ️ **{a}**")
