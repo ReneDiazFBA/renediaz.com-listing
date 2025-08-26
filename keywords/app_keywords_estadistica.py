@@ -40,7 +40,7 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
         from keywords.funcional_keywords_estadistica import (
             filtrar_por_sliders,
             calcular_descriptivos_extendidos,
-            sugerir_log_transform,
+            sugerir_log_transform_robusto,
             aplicar_log10_dinamico
         )
         from keywords.funcional_keywords_deduplicado import formatear_columnas_tabla
@@ -51,7 +51,7 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
 
         # Recomendación de log10
         st.subheader("Sugerencia de Transformación Logarítmica")
-        sugerencias = sugerir_log_transform(df_filtrado)
+        sugerencias = sugerir_log_transform_robusto(df_filtrado)
         for col, valor_skew in sugerencias.items():
             if valor_skew is not None:
                 st.radio(

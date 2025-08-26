@@ -173,23 +173,37 @@ def calcular_descriptivos_extendidos(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(descriptivos).T.reset_index().rename(columns={"index": "Columna"})
 
 
-def sugerir_log_transform(df: pd.DataFrame) -> dict:
+def sugerir_log_transform_robusto(df: pd.DataFrame) -> dict:
     """
-    Analiza skewness para columnas numéricas y sugiere aplicar log10 si skew > 1 o < -1.
+    Sugiere aplicar log10 si se detecta distribución severamente sesgada.
+    Criterios:
+    - Skewness > 1 o < -1
+    - Kurtosis > 3
+    - Rango (max/min) > 1000x
+    Se sugiere log10 si se cumplen al menos 2 criterios.
     """
     sugerencias = {}
     columnas_numericas = df.select_dtypes(include=["number"]).columns
 
     for col in columnas_numericas:
         datos = df[col].dropna()
-        datos_validos = datos[datos > 0]  # log10 solo válido en positivos
+        datos_validos = datos[datos > 0]  # log10 solo en positivos
 
         if len(datos_validos) < 3:
             sugerencias[col] = None
             continue
 
-        valor_skew = skew(datos_validos)
-        sugerencias[col] = valor_skew if abs(valor_skew) > 1 else None
+        skewness = skew(datos_validos)
+        kurt = kurtosis(datos_validos)
+        rango = datos_validos.max() / datos_validos.min() if datos_validos.min() > 0 else 0
+
+        señales = sum([
+            abs(skewness) > 1,
+            kurt > 3,
+            rango > 1000
+        ])
+
+        sugerencias[col] = round(skewness, 2) if señales >= 2 else None
 
     return sugerencias
 
