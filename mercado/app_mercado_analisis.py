@@ -237,7 +237,7 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
             st.warning(
                 "Primero debes subir un archivo Excel en la sección Datos.")
         else:
-            from mercado.funcional_mercado_contraste import obtener_atributos_cliente
+            from mercado.funcional_mercado_contraste import comparar_atributos_mercado_cliente
 
             df_atrib = obtener_atributos_cliente(excel_data)
 
