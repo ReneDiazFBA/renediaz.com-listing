@@ -124,40 +124,55 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
         if excel_data is None:
             st.warning("Primero debes subir un archivo Excel en la sección Datos.")
         else:
-            # Obtener tokens diferenciadores (desde análisis de IA)
             resultados = st.session_state.get("resultados_mercado", {})
             atributos_raw = resultados.get("tokens_diferenciadores", "")
 
+            # Si no hay tokens (porque no se ha corrido IA), usar tokens de prueba para debug
             if not atributos_raw:
                 st.warning("No se encontraron tokens de IA. Se usarán tokens de prueba para depurar.")
-                atributos_mercado = ["color", "material", "durability", "non-toxic", "wooden"]
-            else:
-                atributos_mercado = [
-                    x.strip().lower() for x in atributos_raw.split("\n") if x.strip()
-                ]
+                atributos_raw = """
+                magnetic
+                color-coded
+                maze
+                wooden
+                group play
+                non-toxic
+                storage case
+                numbers
+                shapes
+                fine motor skills
+                """
 
-            from mercado.funcional_mercado_contraste import comparar_atributos_mercado_cliente
-
+            # Convertir texto a lista de tokens limpios
             try:
-                resultados_contraste = comparar_atributos_mercado_cliente(
-                    excel_data, atributos_mercado
-                )
+                atributos_mercado = [x.strip().lower() for x in atributos_raw.strip().split("\n") if x.strip()]
             except Exception as e:
-                st.error(f"Error al ejecutar comparación: {e}")
-                resultados_contraste = {}
+                st.error(f"Error al procesar tokens: {e}")
+                atributos_mercado = []
 
-            # DEBUG: Mostrar claves y tamaños si algo falla
-            if not resultados_contraste or not any([
-                isinstance(v, list) and len(v) > 0 for v in resultados_contraste.values()
-            ]):
-                st.warning("No se encontraron atributos relevantes en CustData.")
-                st.json(resultados_contraste)
+            # Validar que hay atributos para comparar
+            if not atributos_mercado:
+                st.warning("No se pudo generar la lista de atributos del mercado.")
             else:
-                st.success("Comparación completada correctamente.")
-                st.markdown("#### Atributos valorados por el mercado pero ausentes en el cliente")
-                for a in resultados_contraste.get("Atributos valorados por el mercado pero no presentes en cliente", []):
-                    st.markdown(f"- ❗️**{a}**")
+                from mercado.funcional_mercado_contraste import comparar_atributos_mercado_cliente
 
-                st.markdown("#### Atributos declarados por cliente pero ignorados por el mercado")
-                for a in resultados_contraste.get("Atributos declarados por cliente pero ignorados por el mercado", []):
-                    st.markdown(f"- ℹ️ **{a}**")
+                try:
+                    resultados_contraste = comparar_atributos_mercado_cliente(excel_data, atributos_mercado)
+                except Exception as e:
+                    st.error(f"Error al ejecutar comparación: {e}")
+                    return
+
+                # Validar si el dict está vacío o sus listas vacías
+                try:
+                    if not resultados_contraste or all(len(v) == 0 for v in resultados_contraste.values()):
+                        st.warning("No se encontraron atributos relevantes en CustData.")
+                    else:
+                        st.markdown("#### Atributos valorados por el mercado pero ausentes en el cliente")
+                        for a in resultados_contraste["Atributos valorados por el mercado pero no presentes en cliente"]:
+                            st.markdown(f"- ❗️**{a}**")
+
+                        st.markdown("#### Atributos declarados por cliente pero ignorados por el mercado")
+                        for a in resultados_contraste["Atributos declarados por cliente pero ignorados por el mercado"]:
+                            st.markdown(f"- ℹ️ **{a}**")
+                except Exception as e:
+                    st.error(f"Error al validar contenido de resultados: {e}")
