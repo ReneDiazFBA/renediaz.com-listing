@@ -239,7 +239,7 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
         else:
             from mercado.funcional_mercado_contraste import comparar_atributos_mercado_cliente
 
-            df_atrib = obtener_atributos_cliente(excel_data)
+            df_atrib = comparar_atributos_mercado_cliente(excel_data)
 
             if df_atrib.empty:
                 st.warning(
