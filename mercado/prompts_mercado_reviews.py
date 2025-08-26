@@ -111,8 +111,18 @@ REVIEWS:
 
 
 def prompt_tokens_diferenciadores(texto: str) -> str:
-    return _call(f"""Extract unique differentiating tokens or short phrases from these reviews. 
-Useful for bullets or A+ content. List format.
+    return _call(f"""From the following product reviews, extract two separate lists of tokens or short key phrases:
+
+1. **Positive differentiators** – Things that users mention as valuable, unique, or desirable.
+2. **Negative mentions** – Issues, flaws, or disappointments that are commonly noted.
+
+Format the output clearly in English, like:
+
+POSITIVE TOKENS:
+- ...
+
+NEGATIVE TOKENS:
+- ...
 
 REVIEWS:
 {texto}
