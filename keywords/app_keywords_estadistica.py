@@ -97,9 +97,14 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
             aplicar_log10_dinamico
         )
 
-        df = st.session_state.get(
-            "df_transformado") or st.session_state.get("df_filtrado")
-        if df is None:
+        df_transformado = st.session_state.get("df_transformado")
+        df_filtrado = st.session_state.get("df_filtrado")
+
+        if df_transformado is not None:
+            df = df_transformado
+        elif df_filtrado is not None:
+            df = df_filtrado
+        else:
             st.error(
                 "No se ha generado la tabla transformada ni filtrada. Ve primero a la vista descriptiva.")
             return
@@ -162,9 +167,14 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
             interpretar_correlaciones
         )
 
-        df = st.session_state.get(
-            "df_transformado") or st.session_state.get("df_filtrado")
-        if df is None:
+        df_transformado = st.session_state.get("df_transformado")
+        df_filtrado = st.session_state.get("df_filtrado")
+
+        if df_transformado is not None:
+            df = df_transformado
+        elif df_filtrado is not None:
+            df = df_filtrado
+        else:
             st.error(
                 "No se ha generado la tabla transformada ni filtrada. Ve primero a la vista descriptiva.")
             return
@@ -215,9 +225,14 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
             realizar_tests_inferenciales
         )
 
-        df = st.session_state.get(
-            "df_transformado") or st.session_state.get("df_filtrado")
-        if df is None:
+        df_transformado = st.session_state.get("df_transformado")
+        df_filtrado = st.session_state.get("df_filtrado")
+
+        if df_transformado is not None:
+            df = df_transformado
+        elif df_filtrado is not None:
+            df = df_filtrado
+        else:
             st.error(
                 "No se ha generado la tabla transformada ni filtrada. Ve primero a la vista descriptiva.")
             return
