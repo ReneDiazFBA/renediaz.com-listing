@@ -125,6 +125,24 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                 "Primero debes subir un archivo Excel en la sección Datos.")
         else:
             resultados = st.session_state.get("resultados_mercado", {})
+            # DEBUG — carga de tokens manual si no hay resultados IA
+        if "resultados_mercado" not in st.session_state:
+            st.session_state["resultados_mercado"] = {}
+
+        if not st.session_state["resultados_mercado"].get("tokens_diferenciadores"):
+            st.session_state["resultados_mercado"]["tokens_diferenciadores"] = """
+            wooden
+            magnetic
+            non-toxic
+            portable
+            group play
+            educational
+            colorful
+            montessori
+            storage case
+            lightweight
+            """
+
             atributos_raw = resultados.get("tokens_diferenciadores", "")
 
             if not atributos_raw:
