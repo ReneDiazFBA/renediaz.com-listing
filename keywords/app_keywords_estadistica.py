@@ -91,12 +91,6 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
 
     elif active == "graficos":
         st.subheader("Distribución de Métricas")
-
-        from keywords.funcional_keywords_estadistica import (
-            filtrar_por_sliders,
-            aplicar_log10_dinamico
-        )
-
         df_transformado = st.session_state.get("df_transformado")
         df_filtrado = st.session_state.get("df_filtrado")
 
@@ -162,8 +156,6 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
 
         from keywords.funcional_keywords_estadistica import (
             calcular_correlaciones,
-            filtrar_por_sliders,
-            aplicar_log10_dinamico,
             interpretar_correlaciones
         )
 
@@ -220,8 +212,6 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
         st.subheader("Análisis Inferencial")
 
         from keywords.funcional_keywords_estadistica import (
-            filtrar_por_sliders,
-            aplicar_log10_dinamico,
             realizar_tests_inferenciales
         )
 
