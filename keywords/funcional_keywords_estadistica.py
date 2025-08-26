@@ -173,23 +173,47 @@ def calcular_descriptivos_extendidos(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(descriptivos).T.reset_index().rename(columns={"index": "Columna"})
 
 
-def sugerir_log_transform(df: pd.DataFrame) -> dict:
+def sugerir_log_transform_robusto(df: pd.DataFrame) -> dict:
     """
-    Analiza skewness para columnas numéricas y sugiere aplicar log10 si skew > 1 o < -1.
+    Recomienda aplicar log10 si se cumplen al menos 2 de estas condiciones:
+    - Skewness > 1
+    - Kurtosis > 3
+    - Coef. de variación > 100%
+    - Z-Score Máximo > 3
+    - No normal según Shapiro
     """
+    from scipy.stats import skew, kurtosis, shapiro
     sugerencias = {}
     columnas_numericas = df.select_dtypes(include=["number"]).columns
 
     for col in columnas_numericas:
         datos = df[col].dropna()
-        datos_validos = datos[datos > 0]  # log10 solo válido en positivos
+        datos_validos = datos[datos > 0]  # log10 solo para positivos
 
         if len(datos_validos) < 3:
             sugerencias[col] = None
             continue
 
-        valor_skew = skew(datos_validos)
-        sugerencias[col] = valor_skew if abs(valor_skew) > 1 else None
+        # Métricas individuales
+        skew_val = skew(datos_validos)
+        kurt_val = kurtosis(datos_validos)
+        coef_var = (datos_validos.std() / datos_validos.mean()) * \
+            100 if datos_validos.mean() != 0 else 0
+        z_max = ((datos_validos.max() - datos_validos.mean()) /
+                 datos_validos.std()) if datos_validos.std() != 0 else 0
+        normal = "Normal" if shapiro(
+            datos_validos).pvalue > 0.05 else "No normal"
+
+        # Conteo de condiciones
+        condiciones = sum([
+            abs(skew_val) > 1,
+            kurt_val > 3,
+            coef_var > 100,
+            z_max > 3,
+            normal == "No normal"
+        ])
+
+        sugerencias[col] = round(skew_val, 2) if condiciones >= 2 else None
 
     return sugerencias
 
@@ -325,4 +349,3 @@ def realizar_tests_inferenciales(df: pd.DataFrame) -> list:
             )
 
     return resultados
-
