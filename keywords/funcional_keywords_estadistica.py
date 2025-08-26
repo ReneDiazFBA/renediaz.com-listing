@@ -339,3 +339,88 @@ def realizar_tests_inferenciales(df: pd.DataFrame) -> list:
             )
 
     return resultados
+
+
+def categorizar_percentil_columna(col: pd.Series) -> pd.Series:
+    """
+    Convierte columna numérica a etiquetas Bajo / Medio / Alto basado en percentiles.
+    - Valores -1 → se consideran 0 (sin rankeo)
+    - Valores -2 → se excluyen del cálculo (irrelevante)
+    """
+    col = col.replace(-1, 0)
+    col = col.replace(-2, np.nan)
+
+    percentiles = col.rank(pct=True)
+    return pd.cut(
+        percentiles,
+        bins=[0, 0.33, 0.66, 1.0],
+        labels=["Bajo", "Medio", "Alto"],
+        include_lowest=True
+    )
+
+
+def generar_matriz_tiers(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Genera matriz estratégica basada en niveles categorizados por percentil:
+    - ASIN Click Share
+    - Comp Click Share
+    - Niche Click Share x Relevancy
+    """
+    df = df.copy()
+
+    # Imputación
+    df["ASIN Click Share"] = df["ASIN Click Share"].replace(
+        -1, 0).replace(-2, np.nan)
+    df["Comp Click Share"] = df["Comp Click Share"].replace(
+        -1, 0).replace(-2, np.nan)
+    df["Niche Click Share"] = df["Niche Click Share"].replace(
+        -1, 0).replace(-2, np.nan)
+    df["Relevancy"] = df["Relevancy"].replace(-1, 0).replace(-2, np.nan)
+
+    # Nivel ASIN y Subnicho
+    df["ASIN Nivel"] = categorizar_percentil_columna(df["ASIN Click Share"])
+    df["Subnicho Nivel"] = categorizar_percentil_columna(
+        df["Comp Click Share"])
+
+    # Nicho Nivel = producto de Niche Click Share * Relevancy (ambas normalizadas)
+    norm_niche = df["Niche Click Share"].rank(pct=True)
+    norm_rel = df["Relevancy"].rank(pct=True)
+    df["_nicho_score"] = norm_niche * norm_rel
+    df["Nicho Nivel"] = pd.cut(
+        df["_nicho_score"],
+        bins=[0, 0.33, 0.66, 1.0],
+        labels=["Bajo", "Medio", "Alto"],
+        include_lowest=True
+    )
+
+    # Clasificación estratégica
+    def clasificar(row):
+        a, s, n = row["ASIN Nivel"], row["Subnicho Nivel"], row["Nicho Nivel"]
+        clave = f"{a}_{s}_{n}"
+
+        mapa = {
+            "Bajo_Bajo_Bajo": "Irrelevante total",
+            "Bajo_Bajo_Alto": "Oportunidad lejana (nicho)",
+            "Bajo_Alto_Bajo": "Oportunidad directa (subnicho)",
+            "Bajo_Alto_Alto": "Oportunidad crítica (subnicho+nicho)",
+            "Alto_Bajo_Bajo": "Outlier útil (ASIN)",
+            "Alto_Bajo_Alto": "Diferenciación (ASIN + nicho)",
+            "Alto_Alto_Bajo": "Especialización (ASIN + subnicho)",
+            "Alto_Alto_Alto": "Core keyword",
+        }
+
+        return mapa.get(clave, "Patrón intermedio")
+
+    df["Clasificación Estrategia"] = df.apply(clasificar, axis=1)
+
+    # Limpiar resultado
+    columnas_resultado = [
+        "Search Terms",
+        "ASIN Click Share", "ASIN Nivel",
+        "Comp Click Share", "Subnicho Nivel",
+        "Niche Click Share", "Relevancy", "Nicho Nivel",
+        "Clasificación Estrategia"
+    ]
+    resultado = df[columnas_resultado]
+
+    return resultado

@@ -18,6 +18,7 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
         "graficos": ("Gráficos", "graficos"),
         "correlaciones": ("Correlaciones", "correlaciones"),
         "inferencia": ("Inferencia", "inferencia"),
+        "tiers": ("Tiers Estratégicos", "tiers"),
         "ia": ("Análisis IA", "ia"),
     }
 
@@ -244,3 +245,20 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
     elif active == "ia":
         st.subheader("Análisis con IA")
         st.info("Aquí se generarán insights con IA. [Placeholder]")
+
+    elif active == "tiers":
+        st.subheader("Clasificación Estratégica de Keywords")
+
+        from keywords.funcional_keywords_estadistica import generar_matriz_tiers
+
+        df = st.session_state.get("df_filtrado")
+        if df is None:
+            st.error(
+                "No se ha generado la tabla filtrada. Ve primero a la vista descriptiva.")
+            return
+
+        matriz = generar_matriz_tiers(df)
+        st.session_state["matriz_tiers"] = matriz
+
+        st.markdown(f"**Total Keywords clasificadas:** {len(matriz):,}")
+        st.dataframe(matriz, use_container_width=True)
