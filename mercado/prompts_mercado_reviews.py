@@ -1,131 +1,78 @@
-# mercado/prompts_mercado_reviews.py
+# mercado/funcional_mercado_reviews.py
 
-import os
-from typing import Optional
+import pandas as pd
+import streamlit as st
 
-try:
-    from openai import OpenAI
-    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-    _OPENAI_OK = True
-except Exception as e:
-    _OPENAI_OK = False
-    _OPENAI_ERR = str(e)
+from mercado.prompts_mercado_reviews import (
+    prompt_nombre_producto,
+    prompt_descripcion_producto,
+    prompt_beneficios_desde_reviews,
+    prompt_buyer_persona,
+    prompt_pros_cons,
+    prompt_emociones,
+    prompt_lexico_editorial,
+    prompt_visual_suggestions,
+    prompt_tokens_diferenciadores,
+    prompt_validar_preguntas_rufus
+)
 
 
-def _call(prompt: str, role: str = "product expert", temp: float = 0.7) -> str:
-    if not _OPENAI_OK:
-        return f"[ERROR API] { _OPENAI_ERR }"
+def analizar_reviews(excel_data: pd.ExcelFile, preguntas_rufus: list[str] = []) -> dict:
+    """
+    Ejecuta el análisis completo de reviews y devuelve un diccionario estructurado.
+    """
+
     try:
-        completion = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": f"Eres un {role} para listings de Amazon."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=temp
-        )
-        return completion.choices[0].message.content.strip()
+        df = excel_data.parse("Reviews", header=None)
     except Exception as e:
-        return f"[ERROR PROMPT] {str(e)}"
+        st.error(f"Error al cargar hoja 'Reviews': {e}")
+        return {}
 
+    # Validación de columnas esperadas
+    try:
+        titulos = df.iloc[1:, 1].dropna().astype(str)   # Columna B
+        contenidos = df.iloc[1:, 2].dropna().astype(str)  # Columna C
+        autores = df.iloc[1:, 13].dropna().astype(str)  # Columna N
+    except Exception as e:
+        st.error(f"Error al acceder columnas B, C o N: {e}")
+        return {}
 
-# 1. Nombre del producto
-def prompt_nombre_producto(texto: str) -> str:
-    return _call(f"""Dado este texto de reviews reales, genera un nombre de producto atractivo y funcional. 
-Solo devuelve el nombre, sin comillas ni explicación.
+    if titulos.empty or contenidos.empty:
+        st.warning("No hay suficientes títulos o contenidos de reviews.")
+        return {}
 
-TEXT:
-{texto}
-""")
+    # Armar texto combinado para IA
+    reviews_consolidados = [
+        f"{t.strip()}. {c.strip()}" for t, c in zip(titulos, contenidos)]
+    texto_reviews = "\n".join(reviews_consolidados[:300])  # Máximo 300 reviews
 
+    # Mostrar botón
+    if st.button("Generar insights IA"):
+        st.info("Analizando reviews con IA...")
 
-# 2. Descripción breve
-def prompt_descripcion_producto(texto: str) -> str:
-    return _call(f"""Resume este producto en 2 líneas máximo, en inglés, capturando su funcionalidad principal y diferenciadores. 
-No uses bullet points ni encabezados.
+        resultados = {
+            "nombre_producto": prompt_nombre_producto(texto_reviews),
+            "descripcion": prompt_descripcion_producto(texto_reviews),
+            "beneficios": prompt_beneficios_desde_reviews(texto_reviews),
+            "buyer_persona": prompt_buyer_persona(
+                texto_reviews + "\n\nNombres de usuarios: " +
+                ", ".join(autores.head(10))
+            ),
+            "pros_cons": prompt_pros_cons(texto_reviews),
+            "emociones": prompt_emociones(texto_reviews),
+            "lexico_editorial": prompt_lexico_editorial(texto_reviews),
+            "visuales": prompt_visual_suggestions(texto_reviews),
+            "tokens_diferenciadores": prompt_tokens_diferenciadores(texto_reviews),
+        }
 
-REVIEWS:
-{texto}
-""")
+        if preguntas_rufus:
+            resultados["validacion_rufus"] = prompt_validar_preguntas_rufus(
+                texto_reviews, preguntas_rufus
+            )
 
+        st.session_state.resultados_mercado = resultados
+        st.success("Análisis completado.")
+    else:
+        resultados = st.session_state.get("resultados_mercado", {})
 
-# 3. Beneficios valorados
-def prompt_beneficios_desde_reviews(texto: str) -> str:
-    return _call(f"""Identifica los beneficios clave valorados por los usuarios en estos reviews. 
-Devuélvelos en formato lista con viñetas. En inglés.
-
-REVIEWS:
-{texto}
-""")
-
-
-# 4. Buyer persona
-def prompt_buyer_persona(texto: str) -> str:
-    return _call(f"""Basado en estos reviews, describe quién es el buyer persona (edad, tipo de usuario, intereses, emociones, perfil de compra).
-Usa formato texto libre, no bullet points.
-
-REVIEWS:
-{texto}
-""")
-
-
-# 5. Pros y Cons
-def prompt_pros_cons(texto: str) -> str:
-    return _call(f"""Extrae una tabla de 2 columnas: PROS y CONS, con base en estos reviews. 
-Devuelve máximo 5 por lado. En inglés.
-
-REVIEWS:
-{texto}
-""")
-
-
-# 6. Emociones dominantes
-def prompt_emociones(texto: str) -> str:
-    return _call(f"""Resume las emociones positivas y negativas que expresan los usuarios en estos reviews. 
-Devuélvelas en formato de lista separada.
-
-REVIEWS:
-{texto}
-""")
-
-
-# 7. Estilo editorial y léxico
-def prompt_lexico_editorial(texto: str) -> str:
-    return _call(f"""Detecta el estilo editorial que predomina en estos reviews (formal, informal, técnico, emocional, etc.) 
-y extrae una lista de frases comunes o impactantes que podrían usarse en el copy del listing.
-
-REVIEWS:
-{texto}
-""")
-
-
-# 8. Recomendaciones visuales
-def prompt_visual_suggestions(texto: str) -> str:
-    return _call(f"""Extrae sugerencias para el contenido visual del listing basadas en los reviews: colores preferidos, materiales mencionados, 
-contextos de uso, estilo deseado. Devuelve en bullet points.
-
-REVIEWS:
-{texto}
-""")
-
-
-# 9. Tokens de diferenciación
-def prompt_tokens_diferenciadores(texto: str) -> str:
-    return _call(f"""Extrae frases cortas o palabras clave que sirvan como diferenciadores únicos del producto según los reviews. 
-Úsalas luego para destacar beneficios únicos en bullets o A+. Lista corta en inglés.
-
-REVIEWS:
-{texto}
-""")
-
-
-# 10. Validación de preguntas Rufus
-def prompt_validar_preguntas_rufus(texto: str, preguntas: list[str]) -> str:
-    joined = "\n".join([f"- {p}" for p in preguntas])
-    return _call(f"""Con base en estos reviews, responde si es posible responder estas preguntas (sí/no y justificación breve por cada una):
-
-{joined}
-
-REVIEWS:
-{texto}
-""")
+    return resultados
