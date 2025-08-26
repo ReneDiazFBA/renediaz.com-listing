@@ -231,16 +231,24 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                 st.dataframe(df, use_container_width=True)
 
     elif subvista == "cliente":
-        st.subheader("Contraste con Cliente")
+        st.subheader("Contraste con Atributos del Cliente")
 
         if excel_data is None:
             st.warning(
                 "Primero debes subir un archivo Excel en la sección Datos.")
         else:
-            from mercado.funcional_mercado_reviews import comparar_atributos_con_cliente
+            from mercado.funcional_mercado_contraste import obtener_atributos_cliente
 
-            if st.button("Comparar atributos del mercado vs cliente"):
-                resultado = comparar_atributos_con_cliente(excel_data)
-                if resultado:
-                    st.markdown("### Resultado del contraste")
-                    st.markdown(resultado)
+            df_atrib = obtener_atributos_cliente(excel_data)
+
+            if df_atrib.empty:
+                st.warning(
+                    "No se encontraron atributos relevantes en CustData.")
+            else:
+                st.success(
+                    f"Se encontraron {len(df_atrib)} atributos del cliente.")
+                for _, row in df_atrib.iterrows():
+                    nombre = row["atributo"]
+                    variacion = " (variación)" if row["es_variacion"] else ""
+                    valores = ", ".join(row["valores"])
+                    st.markdown(f"- **{nombre}{variacion}**: {valores}")
