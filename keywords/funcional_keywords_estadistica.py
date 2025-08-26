@@ -217,6 +217,8 @@ def aplicar_log10_dinamico(df: pd.DataFrame) -> pd.DataFrame:
     - Preserva los valores -1 y -2.
     - Renombra la columna visualmente: 'Search Volume (log10)'
     """
+    from keywords.funcional_keywords_estadistica import imputar_valores_vacios
+    df = imputar_valores_vacios(df)
     df = df.copy()
     nuevas_columnas = {}
 
