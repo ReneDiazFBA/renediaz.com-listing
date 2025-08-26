@@ -23,21 +23,46 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
 
     if subvista == "insights":
         st.info("Vista: Insights de Reviews (placeholder)")
-    elif subvista == "cliente":
-        st.subheader("📥 Data real del cliente")
+    elif subvista == "insights":
+        st.subheader("Insights del mercado (reviews)")
 
         if excel_data is None:
             st.warning(
                 "Primero debes subir un archivo Excel en la sección Datos.")
         else:
             from mercado.loader_data_cliente import cargar_data_cliente
+            from mercado.funcional_mercado_reviews import analizar_reviews
 
-            data_cliente = cargar_data_cliente(excel_data)
-            if not data_cliente:
-                st.error("No se pudo cargar la información del cliente.")
+            datos = cargar_data_cliente(excel_data)
+            resultados = analizar_reviews(
+                excel_data, datos.get("preguntas_rufus", []))
+
+            if resultados:
+                st.success("Análisis completado con IA.")
+                st.markdown(
+                    f"**Nombre del producto:** {resultados['nombre_producto']}")
+                st.markdown(
+                    f"**Descripción breve:** {resultados['descripcion']}")
+                st.markdown("** Beneficios valorados:**")
+                st.markdown(resultados["beneficios"])
+                st.markdown("**🧍 Buyer persona:**")
+                st.markdown(resultados["buyer_persona"])
+                st.markdown("**Pros / Cons:**")
+                st.markdown(resultados["pros_cons"])
+                st.markdown("** Emociones detectadas:**")
+                st.markdown(resultados["emociones"])
+                st.markdown("** Léxico editorial:**")
+                st.markdown(resultados["lexico_editorial"])
+                st.markdown("** Sugerencias visuales:**")
+                st.markdown(resultados["visuales"])
+                st.markdown("** Tokens diferenciadores:**")
+                st.markdown(resultados["tokens_diferenciadores"])
+
+                if "validacion_rufus" in resultados:
+                    st.markdown("**🛡️ Validación preguntas Rufus:**")
+                    st.markdown(resultados["validacion_rufus"])
             else:
-                st.success("Información cargada correctamente.")
-                st.json(data_cliente)
+                st.warning("No se pudo completar el análisis.")
 
     elif subvista == "editorial":
         st.info("Vista: Léxico Editorial (placeholder)")
