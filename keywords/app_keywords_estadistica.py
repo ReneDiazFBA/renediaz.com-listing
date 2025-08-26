@@ -48,6 +48,9 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
         df_original = st.session_state.master_deduped.copy()
         df_filtrado = filtrar_por_sliders(df_original)
 
+        # Guardar para otras vistas
+        st.session_state.df_filtrado = df_filtrado
+
         # Recomendación de log10
         st.subheader("Sugerencia de Transformación Logarítmica")
         sugerencias = sugerir_log_transform_robusto(df_filtrado)
@@ -62,6 +65,9 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
 
         # Aplicar log10 si corresponde
         df_transformado = aplicar_log10_dinamico(df_filtrado)
+
+        # Guardar transformado también
+        st.session_state.df_transformado = df_transformado
 
         # Mostrar tabla preview
         st.markdown(f"**Total Registros: {len(df_transformado):,}**")
@@ -78,7 +84,6 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
 
             st.success(
                 f"{len(normales)} columnas parecen seguir una distribución normal.")
-
             if not no_normales.empty:
                 st.warning(
                     "Estas columnas **no** siguen una distribución normal:")
