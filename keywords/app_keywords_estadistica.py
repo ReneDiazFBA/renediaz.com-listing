@@ -10,7 +10,6 @@ from utils.nav_utils import render_subnav
 
 
 def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
-    st.markdown("### Keywords — Datos Estadísticos")
     st.caption(
         "Explora las propiedades estadísticas de las keywords deduplicadas.")
 

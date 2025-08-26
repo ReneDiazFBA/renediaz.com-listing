@@ -15,7 +15,6 @@ def mostrar_keywords_deduplicado(excel_data: Optional[pd.ExcelFile] = None):
     """
     Contenedor visual para vista Maestra Deduplicada.
     """
-    st.markdown("### Keywords — Maestra deduplicada")
     st.caption(
         "Unificación y deduplicación inteligente de términos provenientes de todas las fuentes.")
 

@@ -57,4 +57,5 @@ def mostrar_keywords_data(excel_data: Optional[pd.ExcelFile] = None):
 
     # Submódulo: ESTADÍSTICA
     elif submodulo == "Datos Estadísticos":
+        st.markdown("### Keywords — Datos Estadísticos")
         mostrar_keywords_estadistica(excel_data)
