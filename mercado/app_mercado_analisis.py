@@ -2,6 +2,7 @@
 
 import streamlit as st
 import pandas as pd
+import numpy as np 
 from typing import Optional
 from utils.nav_utils import render_subnav
 
@@ -129,48 +130,38 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
             if not atributos_raw:
                 st.warning("No se encontraron tokens de IA. Se usarán tokens de prueba para depurar.")
                 atributos_raw = """
-                color
-                tamaño
-                madera
-                almacenamiento
-                portabilidad
-                materiales no tóxicos
+                durable
+                lightweight
+                compact
+                waterproof
+                foldable
                 """
-
+            # Convertir texto a lista de atributos
             atributos_mercado = [
                 x.strip().lower()
-                for x in atributos_raw.strip().split("\n") if x.strip()
+                for x in atributos_raw.split("\n") if x.strip()
             ]
 
             from mercado.funcional_mercado_contraste import comparar_atributos_mercado_cliente
 
-            resultados_contraste = comparar_atributos_mercado_cliente(
-                excel_data, atributos_mercado
-            )
+            try:
+                resultados_contraste = comparar_atributos_mercado_cliente(
+                    excel_data, atributos_mercado
+                )
+            except Exception as e:
+                st.error(f"Error al procesar comparación: {e}")
+                return
 
-            st.markdown(f"Columnas detectadas: {len(resultados_contraste) if hasattr(resultados_contraste, '__len__') else 'N/A'}")
+            # 🔎 Validación segura: comprobar que hay contenido real
+            try:
+                valores = list(resultados_contraste.values())
+                vacio = all((len(v) == 0 or (isinstance(v, np.ndarray) and v.size == 0)) for v in valores)
+            except Exception as e:
+                st.error(f"Error al validar contenido de resultados: {e}")
+                return
 
-            # Validar si hay datos útiles (protección robusta)
-            hay_datos_utiles = False
-            for k, v in resultados_contraste.items():
-                try:
-                    if isinstance(v, (list, tuple, set, dict, pd.Series, np.ndarray)):
-                        if len(v) > 0:
-                            hay_datos_utiles = True
-                    elif isinstance(v, str):
-                        if v.strip() != "":
-                            hay_datos_utiles = True
-                    else:
-                        if v:
-                            hay_datos_utiles = True
-                except Exception as e:
-                    st.error(f"Error al validar contenido de '{k}': {e}")
-                    continue
-
-            if not hay_datos_utiles:
+            if resultados_contraste is None or vacio:
                 st.warning("No se encontraron atributos relevantes en CustData.")
-                st.caption("Debug:")
-                st.json(resultados_contraste)
             else:
                 st.markdown("#### Atributos valorados por el mercado pero ausentes en el cliente")
                 for a in resultados_contraste.get("Atributos valorados por el mercado pero no presentes en cliente", []):
@@ -179,3 +170,9 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                 st.markdown("#### Atributos declarados por cliente pero ignorados por el mercado")
                 for a in resultados_contraste.get("Atributos declarados por cliente pero ignorados por el mercado", []):
                     st.markdown(f"- ℹ️ **{a}**")
+
+                # Debug opcional controlado
+                with st.expander("🧪 Debug: datos internos de contraste", expanded=False):
+                    for k, v in resultados_contraste.items():
+                        st.markdown(f"**{k}**")
+                        st.code(", ".join(map(str, v)) if isinstance(v, (list, np.ndarray)) else str(v))
