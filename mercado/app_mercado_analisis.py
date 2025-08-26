@@ -237,23 +237,33 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
             st.warning(
                 "Primero debes subir un archivo Excel en la sección Datos.")
         else:
-            from mercado.funcional_mercado_contraste import comparar_atributos_mercado_cliente
+            resultados = st.session_state.get("resultados_mercado", {})
+            atributos_raw = resultados.get("tokens_diferenciadores", "")
 
-            df_atrib = comparar_atributos_mercado_cliente(excel_data)
-
-            if df_atrib.empty:
+            if not atributos_raw:
                 st.warning(
-                    "No se encontraron atributos relevantes en CustData.")
+                    "Primero debes generar los insights de IA (Tokens diferenciadores).")
             else:
-                st.success(
-                    f"Se encontraron {len(df_atrib)} atributos del cliente.")
-                for _, row in df_atrib.iterrows():
-                    nombre = row["atributo"]
-                    variacion = " (variación)" if row["es_variacion"] else ""
-                    valores = ", ".join(row["valores"])
-                    st.markdown(f"- **{nombre}{variacion}**: {valores}")
+                # Convertir texto plano a lista de atributos
+                atributos_mercado = [x.strip().lower()
+                                     for x in atributos_raw.split("\n") if x.strip()]
 
-    # Sección: Tabla Final de Inputs
+                from mercado.funcional_mercado_contraste import comparar_atributos_mercado_cliente
+
+                df_atrib = comparar_atributos_mercado_cliente(
+                    excel_data, atributos_mercado)
+
+                if df_atrib.empty:
+                    st.warning(
+                        "No se encontraron atributos relevantes en CustData.")
+                else:
+                    st.success(
+                        f"Se encontraron {len(df_atrib)} atributos del cliente.")
+                    for _, row in df_atrib.iterrows():
+                        nombre = row["atributo"]
+                        variacion = " (variación)" if row["es_variacion"] else ""
+                        valores = ", ".join(row["valores"])
+                        st.markdown(f"- **{nombre}{variacion}**: {valores}")
 
 
 with st.expander("Tabla Final de Inputs"):
