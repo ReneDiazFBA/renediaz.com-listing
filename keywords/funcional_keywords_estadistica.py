@@ -370,53 +370,13 @@ def generar_matriz_tiers(df: pd.DataFrame) -> pd.DataFrame:
     - ASIN Click Share
     - Comp Click Share
     - Niche Click Share x Relevancy
-    Aplica imputación -1 (falta real) y -2 (irrelevante) internamente solo para esta vista.
+    Aplica imputación -1 (falta real) y -2 (irrelevante) usando función centralizada.
     """
+    from keywords.funcional_keywords_estadistica import imputar_valores_vacios
 
-    # ----- Imputación local -----
-    mapeo_columnas = {
-        "CustKW": ["ASIN Click Share", "Search Volume", "ABA Rank"],
-        "CompKW": ["Comp Click Share", "Search Volume", "Comp Depth", "ABA Rank"],
-        "MiningKW": ["Niche Click Share", "Search Volume", "Niche Depth", "Relevancy"]
-    }
+    df = imputar_valores_vacios(df).copy()
 
-    df = df.copy()
-    df["Fuente"] = df["Fuente"].astype(str).fillna("")
-
-    for col in set().union(*mapeo_columnas.values()):
-        if col in df.columns:
-            serie = (
-                df[col]
-                .astype(str)
-                .str.replace("%", "", regex=False)
-                .str.replace(",", "", regex=False)
-                .replace({"NAF": pd.NA, "None": pd.NA, "nan": pd.NA, "": pd.NA})
-            )
-            df[col] = pd.to_numeric(serie, errors="coerce")
-
-    columnas_numericas = [
-        c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
-
-    for col in columnas_numericas:
-        for fuente, cols_relev in mapeo_columnas.items():
-            mask = df["Fuente"].str.contains(
-                fuente, regex=False, na=False) & df[col].isna()
-            if col in cols_relev:
-                df.loc[mask, col] = -1
-            else:
-                df.loc[mask, col] = -2
-
-    # ----- Imputación para normalizar -----
-    asin_tmp = df["ASIN Click Share"].replace(
-        -1, 0).replace(-2, np.nan) if "ASIN Click Share" in df.columns else pd.Series(dtype=float)
-    comp_tmp = df["Comp Click Share"].replace(
-        -1, 0).replace(-2, np.nan) if "Comp Click Share" in df.columns else pd.Series(dtype=float)
-    niche_tmp = df["Niche Click Share"].replace(
-        -1, 0).replace(-2, np.nan) if "Niche Click Share" in df.columns else pd.Series(dtype=float)
-    rel_tmp = df["Relevancy"].replace(-1, 0).replace(-2,
-                                                     np.nan) if "Relevancy" in df.columns else pd.Series(dtype=float)
-
-    # ----- Categorización -----
+    # ----- Categorización auxiliar -----
     def categorizar(col: pd.Series) -> pd.Series:
         col = col.replace(-1, 0).replace(-2, np.nan)
         percentiles = col.rank(pct=True)
@@ -427,12 +387,23 @@ def generar_matriz_tiers(df: pd.DataFrame) -> pd.DataFrame:
             include_lowest=True
         )
 
+    # ----- ASIN y Subnicho -----
+    asin_tmp = df["ASIN Click Share"].replace(
+        -1, 0).replace(-2, np.nan) if "ASIN Click Share" in df.columns else pd.Series(dtype=float)
+    comp_tmp = df["Comp Click Share"].replace(
+        -1, 0).replace(-2, np.nan) if "Comp Click Share" in df.columns else pd.Series(dtype=float)
+
     df["ASIN Nivel"] = categorizar(asin_tmp) if not asin_tmp.empty else pd.Series(
         index=df.index, dtype="category")
     df["Subnicho Nivel"] = categorizar(
         comp_tmp) if not comp_tmp.empty else pd.Series(index=df.index, dtype="category")
 
-    # Nicho Nivel = producto de percentil(Niche Click Share) * percentil(Relevancy)
+    # ----- Nicho = producto de percentiles -----
+    niche_tmp = df["Niche Click Share"].replace(
+        -1, 0).replace(-2, np.nan) if "Niche Click Share" in df.columns else pd.Series(dtype=float)
+    rel_tmp = df["Relevancy"].replace(-1, 0).replace(-2,
+                                                     np.nan) if "Relevancy" in df.columns else pd.Series(dtype=float)
+
     norm_niche = niche_tmp.rank(pct=True)
     norm_rel = rel_tmp.rank(pct=True)
     nicho_score = (norm_niche.fillna(0) * norm_rel.fillna(0)
