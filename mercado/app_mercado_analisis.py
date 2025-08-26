@@ -1,6 +1,7 @@
 # mercado/app_mercado_analisis.py
 
 import streamlit as st
+import pandas as pd
 from typing import Optional
 from utils.nav_utils import render_subnav
 
