@@ -22,8 +22,6 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
     st.divider()
 
     if subvista == "insights":
-        st.info("Vista: Insights de Reviews (placeholder)")
-    elif subvista == "insights":
         st.subheader("Insights del mercado (reviews)")
 
         if excel_data is None:
@@ -43,23 +41,23 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                     f"**Nombre del producto:** {resultados['nombre_producto']}")
                 st.markdown(
                     f"**Descripción breve:** {resultados['descripcion']}")
-                st.markdown("** Beneficios valorados:**")
+                st.markdown("**Beneficios valorados:**")
                 st.markdown(resultados["beneficios"])
-                st.markdown("**🧍 Buyer persona:**")
+                st.markdown("**Buyer persona:**")
                 st.markdown(resultados["buyer_persona"])
                 st.markdown("**Pros / Cons:**")
                 st.markdown(resultados["pros_cons"])
-                st.markdown("** Emociones detectadas:**")
+                st.markdown("**Emociones detectadas:**")
                 st.markdown(resultados["emociones"])
-                st.markdown("** Léxico editorial:**")
+                st.markdown("**Léxico editorial:**")
                 st.markdown(resultados["lexico_editorial"])
-                st.markdown("** Sugerencias visuales:**")
+                st.markdown("**Sugerencias visuales:**")
                 st.markdown(resultados["visuales"])
-                st.markdown("** Tokens diferenciadores:**")
+                st.markdown("**Tokens diferenciadores:**")
                 st.markdown(resultados["tokens_diferenciadores"])
 
                 if "validacion_rufus" in resultados:
-                    st.markdown("**🛡️ Validación preguntas Rufus:**")
+                    st.markdown("**Validación preguntas Rufus:**")
                     st.markdown(resultados["validacion_rufus"])
             else:
                 st.warning("No se pudo completar el análisis.")
