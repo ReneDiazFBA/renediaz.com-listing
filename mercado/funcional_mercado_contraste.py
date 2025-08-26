@@ -20,8 +20,6 @@ def comparar_atributos_mercado_cliente(excel_data: pd.ExcelFile, atributos_merca
     df = df.dropna(how="all")
 
     # Validar que hay al menos 3 columnas
-    st.markdown("### Vista previa de CustData (debug)")
-    st.dataframe(df.head(5))
     st.write(f"Columnas detectadas: {df.shape[1]}")
 
     if df.shape[1] < 3:

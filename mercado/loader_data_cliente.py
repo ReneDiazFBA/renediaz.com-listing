@@ -6,7 +6,7 @@ import streamlit as st
 
 def cargar_data_cliente(excel_data: pd.ExcelFile) -> dict:
     """
-    Carga y estructura la información del cliente desde la hoja 'DataCliente'.
+    Carga y estructura la información del cliente desde la hoja 'CustData'.
 
     Returns:
         dict: {
@@ -17,9 +17,9 @@ def cargar_data_cliente(excel_data: pd.ExcelFile) -> dict:
         }
     """
     try:
-        df = excel_data.parse("DataCliente", header=None)
+        df = excel_data.parse("CustData", header=None)
     except Exception as e:
-        st.error(f"Error al cargar hoja DataCliente: {e}")
+        st.error(f"Error al cargar hoja CustData: {e}")
         return {}
 
     # ASIN del cliente (fila 3, columna C)
