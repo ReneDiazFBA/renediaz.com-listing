@@ -66,5 +66,51 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
         st.info("Vista: Léxico Editorial (placeholder)")
     elif subvista == "visual":
         st.info("Vista: Recomendaciones Visuales (placeholder)")
+
     elif subvista == "tabla":
-        st.info("Vista: Tabla Final de Inputs (placeholder)")
+        st.subheader("Tabla Final de Inputs extraídos del mercado")
+
+        resultados = st.session_state.get("resultados_mercado", {})
+
+        if not resultados:
+            st.warning(
+                "Primero debes generar los insights con el botón en 'Insights de Reviews'.")
+        else:
+            data = []
+
+            def agregar(fuente, tipo, contenido, etiqueta=None):
+                if not contenido:
+                    return
+                lineas = contenido.strip().split("\n")
+                for linea in lineas:
+                    linea = linea.strip().lstrip("-•").strip()
+                    if linea:
+                        data.append({
+                            "Tipo": tipo,
+                            "Contenido": linea,
+                            "Etiqueta": etiqueta or "",
+                            "Fuente": fuente
+                        })
+
+            agregar("Reviews", "Nombre sugerido",
+                    resultados.get("nombre_producto"))
+            agregar("Reviews", "Descripción breve",
+                    resultados.get("descripcion"))
+            agregar("Reviews", "Beneficio", resultados.get(
+                "beneficios"), etiqueta="Positivo")
+            agregar("Reviews", "Pros/Cons", resultados.get("pros_cons"))
+            agregar("Reviews", "Emoción", resultados.get("emociones"))
+            agregar("Reviews", "Léxico editorial",
+                    resultados.get("lexico_editorial"))
+            agregar("Reviews", "Visual", resultados.get("visuales"))
+            agregar("Reviews", "Token", resultados.get(
+                "tokens_diferenciadores"))
+            agregar("Reviews", "Validación Rufus",
+                    resultados.get("validacion_rufus"))
+
+            df = pd.DataFrame(data)
+
+            if df.empty:
+                st.info("No hay datos para mostrar.")
+            else:
+                st.dataframe(df, use_container_width=True)
