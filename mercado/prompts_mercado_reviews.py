@@ -140,3 +140,43 @@ QUESTIONS:
 REVIEWS:
 {texto}
 """)
+
+ # mercado/prompts_mercado_reviews.py (agregar al final)
+
+
+def prompt_comparar_atributos_mercado_vs_cliente(
+    beneficios: str,
+    tokens: str,
+    visuales: str,
+    atributos_cliente: list[str]
+) -> str:
+    """
+    Compara los atributos que el mercado valora vs los que el cliente ofrece.
+    """
+    atributos_joined = "\n".join([f"- {a}" for a in atributos_cliente])
+
+    return _call(f"""
+Based on the following Amazon review analysis (benefits, differentiator tokens, and visual cues), extract the product attributes that customers clearly value.
+
+Then compare these attributes to the ones provided by the client.
+
+List:
+1. Attributes valued by the market.
+2. Attributes the client provides that are also valued by the market.
+3. Attributes valued by the market that are **missing** from the client.
+4. Attributes the client provides but are **not** mentioned or valued by the market.
+
+BENEFITS FROM REVIEWS:
+{beneficios}
+
+DIFFERENTIATION TOKENS:
+{tokens}
+
+VISUAL SUGGESTIONS:
+{visuales}
+
+CLIENT ATTRIBUTES:
+{atributos_joined}
+
+Be clear and organized. Respond in English.
+""", temp=0.3)

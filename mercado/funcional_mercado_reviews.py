@@ -1,5 +1,6 @@
 # mercado/funcional_mercado_reviews.py
 
+from mercado.prompts_mercado_reviews import prompt_comparar_atributos_mercado_vs_cliente
 import pandas as pd
 import streamlit as st
 
@@ -75,3 +76,44 @@ def analizar_reviews(excel_data: pd.ExcelFile, preguntas_rufus: list[str] = []) 
         resultados = st.session_state.get("resultados_mercado", {})
 
     return resultados
+
+
+def comparar_atributos_con_cliente(excel_data: pd.ExcelFile) -> str:
+    """
+    Contrasta los atributos valorados por el mercado con los que ofrece el cliente.
+    Devuelve un texto estructurado con hallazgos.
+    """
+    if "resultados_mercado" not in st.session_state:
+        st.warning("Primero debes generar los insights del mercado.")
+        return ""
+
+    resultados = st.session_state["resultados_mercado"]
+
+    beneficios = resultados.get("beneficios", "")
+    tokens = resultados.get("tokens_diferenciadores", "")
+    visuales = resultados.get("visuales", "")
+
+    try:
+        df = excel_data.parse("CustData", header=None)
+    except Exception as e:
+        st.error(f"Error al cargar hoja 'CustData': {e}")
+        return ""
+
+    try:
+        atributos = df.iloc[11:24, 4].dropna().astype(str).tolist()
+    except Exception as e:
+        st.error(f"Error al leer atributos del cliente desde CustData: {e}")
+        return ""
+
+    if not atributos:
+        st.warning("No se encontraron atributos del cliente.")
+        return ""
+
+    resultado = prompt_comparar_atributos_mercado_vs_cliente(
+        beneficios=beneficios,
+        tokens=tokens,
+        visuales=visuales,
+        atributos_cliente=atributos
+    )
+
+    return resultado
