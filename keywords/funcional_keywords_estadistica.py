@@ -62,6 +62,7 @@ def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
     from keywords.funcional_keywords_estadistica import imputar_valores_vacios
 
     df = imputar_valores_vacios(df)
+    df = df.replace(-1, 0)
     df_filtrado = df.copy()
 
     columnas_numericas = [
@@ -219,6 +220,7 @@ def aplicar_log10_dinamico(df: pd.DataFrame) -> pd.DataFrame:
     """
     from keywords.funcional_keywords_estadistica import imputar_valores_vacios
     df = imputar_valores_vacios(df)
+    df = df.replace(-1, 0)
     df = df.copy()
     nuevas_columnas = {}
 
@@ -375,6 +377,7 @@ def generar_matriz_tiers(df: pd.DataFrame) -> pd.DataFrame:
     from keywords.funcional_keywords_estadistica import imputar_valores_vacios
 
     df = imputar_valores_vacios(df).copy()
+    df = df.replace(-1, 0)
 
     # ----- Categorización auxiliar -----
     def categorizar(col: pd.Series) -> pd.Series:
