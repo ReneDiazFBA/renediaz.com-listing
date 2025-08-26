@@ -121,64 +121,50 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
         st.subheader("Contraste con Atributos del Cliente")
 
         if excel_data is None:
-            st.warning(
-                "Primero debes subir un archivo Excel en la sección Datos.")
+            st.warning("Primero debes subir un archivo Excel en la sección Datos.")
         else:
-            resultados = st.session_state.get("resultados_mercado", {})
-            # DEBUG — carga de tokens manual si no hay resultados IA
-        if "resultados_mercado" not in st.session_state:
-            st.session_state["resultados_mercado"] = {}
+            # Cargar tokens diferenciadores, o insertar ejemplo si aún no hay IA
+            if "resultados_mercado" not in st.session_state:
+                st.session_state["resultados_mercado"] = {}
 
-        if not st.session_state["resultados_mercado"].get("tokens_diferenciadores"):
-            st.session_state["resultados_mercado"]["tokens_diferenciadores"] = """
-            wooden
-            magnetic
-            non-toxic
-            portable
-            group play
-            educational
-            colorful
-            montessori
-            storage case
-            lightweight
-            """
+            if not st.session_state["resultados_mercado"].get("tokens_diferenciadores"):
+                st.warning("No se encontraron tokens de IA. Se usarán tokens de prueba para depurar.")
+                st.session_state["resultados_mercado"]["tokens_diferenciadores"] = """
+                wooden
+                magnetic
+                non-toxic
+                portable
+                group play
+                educational
+                colorful
+                montessori
+                storage case
+                lightweight
+                """
 
-            atributos_raw = resultados.get("tokens_diferenciadores", "")
+            resultados = st.session_state["resultados_mercado"]
+            atributos_raw = resultados["tokens_diferenciadores"]
 
-            if not atributos_raw:
-                st.warning(
-                    "Primero debes generar los insights de IA (Tokens diferenciadores).")
+            atributos_mercado = [
+                x.strip().lower()
+                for x in atributos_raw.split("\n") if x.strip()
+            ]
+
+            from mercado.funcional_mercado_contraste import comparar_atributos_mercado_cliente
+
+            resultados_contraste = comparar_atributos_mercado_cliente(
+                excel_data, atributos_mercado
+            )
+
+            if resultados_contraste is None or not any(
+                bool(v) for v in resultados_contraste.values()
+            ):
+                st.warning("No se encontraron atributos relevantes para comparar.")
             else:
-                atributos_mercado = [
-                    x.strip().lower()
-                    for x in atributos_raw.split("\n") if x.strip()
-                ]
+                st.markdown("#### Atributos valorados por el mercado pero ausentes en el cliente")
+                for a in resultados_contraste["Atributos valorados por el mercado pero no presentes en cliente"]:
+                    st.markdown(f"- ❗️**{a}**")
 
-                from mercado.funcional_mercado_contraste import comparar_atributos_mercado_cliente
-
-                resultados_contraste = comparar_atributos_mercado_cliente(
-                    excel_data, atributos_mercado
-                )
-
-                # Debug visual completo
-                st.caption("🔍 Debug de resultados_contraste:")
-                for k, v in resultados_contraste.items():
-                    st.markdown(f"**{k}** → {len(v)} items")
-
-                if (
-                    resultados_contraste is None or
-                    not any(isinstance(v, (list, tuple, set)) and len(v) > 0
-                            for v in resultados_contraste.values())
-                ):
-                    st.warning(
-                        "No se encontraron atributos relevantes en CustData.")
-                else:
-                    st.markdown(
-                        "#### Atributos valorados por el mercado pero ausentes en el cliente")
-                    for a in resultados_contraste.get("Atributos valorados por el mercado pero no presentes en cliente", []):
-                        st.markdown(f"- ❗️**{a}**")
-
-                    st.markdown(
-                        "#### Atributos declarados por cliente pero ignorados por el mercado")
-                    for a in resultados_contraste.get("Atributos declarados por cliente pero ignorados por el mercado", []):
-                        st.markdown(f"- ℹ️ **{a}**")
+                st.markdown("#### Atributos declarados por cliente pero ignorados por el mercado")
+                for a in resultados_contraste["Atributos declarados por cliente pero ignorados por el mercado"]:
+                    st.markdown(f"- ℹ️ **{a}**")
