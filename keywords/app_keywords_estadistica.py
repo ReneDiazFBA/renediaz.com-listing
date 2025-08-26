@@ -119,12 +119,12 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
             st.markdown(
                 f"**Media:** {media:.2f} &nbsp;&nbsp; | &nbsp;&nbsp; **Desviación estándar:** {std:.2f}")
 
-            # 🎯 Histograma con línea Gauss
+            # Histograma con línea Gauss
             fig, ax = plt.subplots()
             sns.histplot(serie_valida, bins=20, kde=False,
                          color="#0071bc", ax=ax)
 
-            # 🔁 Superponer curva Gauss si STD > 0
+            # Superponer curva Gauss si STD > 0
             if std > 0:
                 from scipy.stats import norm
                 x = np.linspace(serie_valida.min(), serie_valida.max(), 100)
@@ -138,7 +138,7 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
             ax.legend()
             st.pyplot(fig)
 
-            # 📦 Boxplot
+            # Boxplot
             fig2, ax2 = plt.subplots(figsize=(8, 1.5))
             sns.boxplot(x=serie_valida, color="#0071bc", ax=ax2)
             ax2.set_title(f"Boxplot de {selected_col}")
