@@ -40,10 +40,14 @@ def analizar_reviews(excel_data: pd.ExcelFile, preguntas_rufus: list[str] = []) 
         st.warning("Not enough valid reviews found.")
         return {}
 
-    # Combine title + body
+    # Combine title + body (limit to avoid 8192 token context)
     reviews_consolidados = [
-        f"{t.strip()}. {c.strip()}" for t, c in zip(titulos, contenidos)]
-    texto_reviews = "\n".join(reviews_consolidados[:300])  # Max 300 reviews
+        f"{t.strip()}. {c.strip()}" for t, c in zip(titulos, contenidos)
+    ]
+    texto_reviews = "\n".join(
+        reviews_consolidados[:100])  # limit to 100 reviews
+    # hard cap in characters for extra safety
+    texto_reviews = texto_reviews[:12000]
 
     if st.button("Generate AI insights"):
         st.info("Analyzing reviews using AI...")
