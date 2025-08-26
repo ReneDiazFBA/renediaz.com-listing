@@ -252,3 +252,35 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                     variacion = " (variación)" if row["es_variacion"] else ""
                     valores = ", ".join(row["valores"])
                     st.markdown(f"- **{nombre}{variacion}**: {valores}")
+
+    # Sección: Tabla Final de Inputs
+
+
+with st.expander("Tabla Final de Inputs"):
+
+    resultados = st.session_state.get("resultados_mercado", {})
+
+    if not resultados:
+        st.warning("Primero debes generar los insights con IA.")
+    else:
+        try:
+            import pandas as pd
+
+            datos = {
+                "Nombre del producto": resultados.get("nombre_producto", ""),
+                "Descripción breve": resultados.get("descripcion", ""),
+                "Beneficios valorados": resultados.get("beneficios", ""),
+                "Buyer persona": resultados.get("buyer_persona", ""),
+                "Pros y Cons": resultados.get("pros_cons", ""),
+                "Emociones detectadas": resultados.get("emociones", ""),
+                "Léxico editorial": resultados.get("lexico_editorial", ""),
+                "Sugerencias visuales": resultados.get("visuales", ""),
+                "Tokens diferenciadores": resultados.get("tokens_diferenciadores", "")
+            }
+
+            df = pd.DataFrame.from_dict(
+                datos, orient="index", columns=["Resultado"])
+            st.dataframe(df, use_container_width=True)
+
+        except Exception as e:
+            st.error(f"Error al mostrar tabla final: {e}")
