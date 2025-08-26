@@ -368,61 +368,47 @@ def categorizar_percentil_columna(col: pd.Series) -> pd.Series:
 
 def generar_matriz_tiers(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Genera matriz estratégica basada en niveles categorizados por percentil:
+    Genera matriz estratégica basada en niveles categorizados por percentil.
     - ASIN Click Share
     - Comp Click Share
     - Niche Click Share x Relevancy
-    Aplica imputación -1 (falta real) y -2 (irrelevante) usando función centralizada.
+    df ya debe venir imputado y con -1 tratados como 0.
     """
-    from keywords.funcional_keywords_estadistica import imputar_valores_vacios
-
     df = df.copy()
 
-    # ----- Categorización auxiliar -----
+    # Convertir -2 (irrelevante) a NaN y luego cualquier NaN lo tratamos como "Bajo"
     def categorizar(col: pd.Series) -> pd.Series:
-        col = col.replace(-1, 0).replace(-2, np.nan)
+        col = col.replace(-2, np.nan)
         percentiles = col.rank(pct=True)
-        return pd.cut(
+        niveles = pd.cut(
             percentiles,
             bins=[0, 0.33, 0.66, 1.0],
             labels=["Bajo", "Medio", "Alto"],
             include_lowest=True
         )
+        return niveles.fillna("Bajo")  # ✅ Si no hay dato, se considera Bajo
 
-    # ----- ASIN y Subnicho -----
-    asin_tmp = df["ASIN Click Share"].replace(
-        -1, 0).replace(-2, np.nan) if "ASIN Click Share" in df.columns else pd.Series(dtype=float)
-    comp_tmp = df["Comp Click Share"].replace(
-        -1, 0).replace(-2, np.nan) if "Comp Click Share" in df.columns else pd.Series(dtype=float)
+    asin_tmp = df["ASIN Click Share"].replace(-2, np.nan)
+    comp_tmp = df["Comp Click Share"].replace(-2, np.nan)
+    niche_tmp = df["Niche Click Share"].replace(-2, np.nan)
+    rel_tmp = df["Relevancy"].replace(-2, np.nan)
 
-    df["ASIN Nivel"] = categorizar(asin_tmp) if not asin_tmp.empty else pd.Series(
-        index=df.index, dtype="category")
-    df["Subnicho Nivel"] = categorizar(
-        comp_tmp) if not comp_tmp.empty else pd.Series(index=df.index, dtype="category")
-
-    # ----- Nicho = producto de percentiles -----
-    niche_tmp = df["Niche Click Share"].replace(
-        -1, 0).replace(-2, np.nan) if "Niche Click Share" in df.columns else pd.Series(dtype=float)
-    rel_tmp = df["Relevancy"].replace(-1, 0).replace(-2,
-                                                     np.nan) if "Relevancy" in df.columns else pd.Series(dtype=float)
+    df["ASIN Nivel"] = categorizar(asin_tmp)
+    df["Subnicho Nivel"] = categorizar(comp_tmp)
 
     norm_niche = niche_tmp.rank(pct=True)
     norm_rel = rel_tmp.rank(pct=True)
-    nicho_score = (norm_niche.fillna(0) * norm_rel.fillna(0)
-                   ).reindex(df.index).fillna(0)
+    nicho_score = norm_niche.fillna(0) * norm_rel.fillna(0)
 
     df["Nicho Nivel"] = pd.cut(
         nicho_score,
         bins=[0, 0.33, 0.66, 1.0],
         labels=["Bajo", "Medio", "Alto"],
         include_lowest=True
-    )
+    ).fillna("Bajo")  # ✅ Si no hay relevancia, también se considera Bajo
 
-    # ----- Clasificación Estratégica -----
     def clasificar(row):
-        a, s, n = row.get("ASIN Nivel"), row.get(
-            "Subnicho Nivel"), row.get("Nicho Nivel")
-        clave = f"{a}_{s}_{n}"
+        clave = f"{row.get('ASIN Nivel')}_{row.get('Subnicho Nivel')}_{row.get('Nicho Nivel')}"
         mapa = {
             "Bajo_Bajo_Bajo": "Irrelevante total",
             "Bajo_Bajo_Alto": "Oportunidad lejana (nicho)",
@@ -433,19 +419,35 @@ def generar_matriz_tiers(df: pd.DataFrame) -> pd.DataFrame:
             "Alto_Alto_Bajo": "Especialización (ASIN + subnicho)",
             "Alto_Alto_Alto": "Core keyword",
         }
-        return mapa.get(clave, "Patrón intermedio")
+        return mapa.get(clave, "Irrelevante total")  # 🔒 fallback conservador
 
     df["Clasificación Estrategia"] = df.apply(clasificar, axis=1)
 
+    prioridad = {
+        "Core keyword": 1,
+        "Oportunidad crítica (subnicho+nicho)": 2,
+        "Oportunidad directa (subnicho)": 3,
+        "Especialización (ASIN + subnicho)": 4,
+        "Diferenciación (ASIN + nicho)": 5,
+        "Outlier útil (ASIN)": 6,
+        "Oportunidad lejana (nicho)": 7,
+        "Irrelevante total": 8
+    }
+
+    df["Prioridad Estrategia"] = df["Clasificación Estrategia"].map(prioridad)
+
     columnas_resultado = [
-        c for c in [
-            "Search Terms",
-            "ASIN Click Share", "ASIN Nivel",
-            "Comp Click Share", "Subnicho Nivel",
-            "Niche Click Share", "Relevancy", "Nicho Nivel",
-            "Clasificación Estrategia",
-            "Fuente"
-        ] if c in df.columns
+        "Search Terms",
+        "Search Volume",
+        "ASIN Click Share", "ASIN Nivel",
+        "Comp Click Share", "Subnicho Nivel",
+        "Niche Click Share", "Relevancy", "Nicho Nivel",
+        "Clasificación Estrategia"
     ]
 
-    return df[columnas_resultado].reset_index(drop=True)
+    df_ordenado = df[columnas_resultado + ["Prioridad Estrategia"]].sort_values(
+        by=["Prioridad Estrategia", "Search Volume"],
+        ascending=[True, False]
+    ).drop(columns=["Prioridad Estrategia"]).reset_index(drop=True)
+
+    return df_ordenado
