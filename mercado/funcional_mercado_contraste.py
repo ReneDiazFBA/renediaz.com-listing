@@ -6,7 +6,8 @@ import streamlit as st
 
 def comparar_atributos_mercado_cliente(excel_data: pd.ExcelFile, atributos_mercado: list[str]) -> pd.DataFrame:
     """
-    Compara los atributos detectados en los reviews con los que el cliente dice tener (CustData).
+    Compara los atributos detectados en los reviews con los que el cliente declara tener (CustData).
+    Devuelve un DataFrame vertical para visualización.
     """
 
     try:
@@ -28,33 +29,38 @@ def comparar_atributos_mercado_cliente(excel_data: pd.ExcelFile, atributos_merca
     df.columns = ["Atributo", "Relevante", "Variacion"] + \
         [f"Valor_{i}" for i in range(1, col_total - 3 + 1)]
 
-    # Limpiar filas sin atributo
+    # Limpiar filas sin atributo o irrelevantes
     df = df[df["Atributo"].notna()]
-    df = df[df["Relevante"].notna()]
+    df = df[df["Relevante"].str.lower() == "si"]
 
     # Convertir a string por seguridad
-    df["Atributo"] = df["Atributo"].astype(str)
-    df["Relevante"] = df["Relevante"].astype(str)
-    df["Variacion"] = df["Variacion"].astype(str)
+    df["Atributo"] = df["Atributo"].astype(str).str.strip().str.lower()
 
-    # Separar listas
-    atributos_cliente = df["Atributo"].str.strip().str.lower().tolist()
+    # Lista de atributos declarados por el cliente
+    atributos_cliente = df["Atributo"].tolist()
+
+    # Normalizar los atributos del mercado
     atributos_mercado = [a.strip().lower() for a in atributos_mercado]
 
-    # Atributos mencionados en reviews pero no en cliente
-    en_mercado_no_cliente = [
-        a for a in atributos_mercado if a not in atributos_cliente]
+    # Comparación
+    en_mercado_no_cliente = [a for a in atributos_mercado if a not in atributos_cliente]
+    en_cliente_no_mercado = [a for a in atributos_cliente if a not in atributos_mercado]
+    presentes_en_ambos = [a for a in atributos_mercado if a in atributos_cliente]
 
-    # Atributos declarados por cliente pero no mencionados en mercado
-    en_cliente_no_mercado = [
-        a for a in atributos_cliente if a not in atributos_mercado]
+    # Construir DataFrame de resumen
+    data = {
+        "Atributos del mercado": atributos_mercado,
+        "Presente en cliente": ["✅" if a in atributos_cliente else "❌" for a in atributos_mercado]
+    }
+    df_comparado = pd.DataFrame(data)
 
-    # Resultado
-    resultado = {
-        "Atributos detectados en reviews (mercado)": atributos_mercado,
-        "Atributos indicados por el cliente": atributos_cliente,
-        "Atributos valorados por el mercado pero no presentes en cliente": en_mercado_no_cliente,
-        "Atributos declarados por cliente pero ignorados por el mercado": en_cliente_no_mercado
+    # Expandir resumen adicional (para vista por tipo)
+    resumen = {
+        "Detectados en reviews (mercado)": atributos_mercado,
+        "Indicados por el cliente": atributos_cliente,
+        "Valorados por mercado pero ausentes en cliente": en_mercado_no_cliente,
+        "Declarados por cliente pero no valorados por mercado": en_cliente_no_mercado,
+        "Atributos presentes en ambos": presentes_en_ambos
     }
 
-    return resultado
+    return df_comparado  # también puedes retornar resumen como segundo valor si luego lo necesitas
