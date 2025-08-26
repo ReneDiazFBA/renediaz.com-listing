@@ -54,10 +54,7 @@ def analizar_reviews(excel_data: pd.ExcelFile, preguntas_rufus: list[str] = []) 
             "nombre_producto": prompt_nombre_producto(texto_reviews),
             "descripcion": prompt_descripcion_producto(texto_reviews),
             "beneficios": prompt_beneficios_desde_reviews(texto_reviews),
-            "buyer_persona": prompt_buyer_persona(
-                texto_reviews + "\n\nNombres de usuarios: " +
-                ", ".join(autores.head(10))
-            ),
+            "buyer_persona": prompt_buyer_persona(texto_reviews, autores.tolist()),
             "pros_cons": prompt_pros_cons(texto_reviews),
             "emociones": prompt_emociones(texto_reviews),
             "lexico_editorial": prompt_lexico_editorial(texto_reviews),
