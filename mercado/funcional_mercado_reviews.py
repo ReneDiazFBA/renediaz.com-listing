@@ -19,36 +19,34 @@ from mercado.prompts_mercado_reviews import (
 
 def analizar_reviews(excel_data: pd.ExcelFile, preguntas_rufus: list[str] = []) -> dict:
     """
-    Ejecuta el análisis completo de reviews y devuelve un diccionario estructurado.
+    Executes full review analysis and returns a structured dict.
     """
 
     try:
         df = excel_data.parse("Reviews", header=None)
     except Exception as e:
-        st.error(f"Error al cargar hoja 'Reviews': {e}")
+        st.error(f"Error loading 'Reviews' sheet: {e}")
         return {}
 
-    # Validación de columnas esperadas
     try:
-        titulos = df.iloc[1:, 1].dropna().astype(str)   # Columna B
-        contenidos = df.iloc[1:, 2].dropna().astype(str)  # Columna C
-        autores = df.iloc[1:, 13].dropna().astype(str)  # Columna N
+        titulos = df.iloc[1:, 1].dropna().astype(str)   # Column B
+        contenidos = df.iloc[1:, 2].dropna().astype(str)  # Column C
+        autores = df.iloc[1:, 13].dropna().astype(str)  # Column N
     except Exception as e:
-        st.error(f"Error al acceder columnas B, C o N: {e}")
+        st.error(f"Error accessing columns B, C or N: {e}")
         return {}
 
     if titulos.empty or contenidos.empty:
-        st.warning("No hay suficientes títulos o contenidos de reviews.")
+        st.warning("Not enough valid reviews found.")
         return {}
 
-    # Armar texto combinado para IA
+    # Combine title + body
     reviews_consolidados = [
         f"{t.strip()}. {c.strip()}" for t, c in zip(titulos, contenidos)]
-    texto_reviews = "\n".join(reviews_consolidados[:300])  # Máximo 300 reviews
+    texto_reviews = "\n".join(reviews_consolidados[:300])  # Max 300 reviews
 
-    # Mostrar botón
-    if st.button("Generar insights IA"):
-        st.info("Analizando reviews con IA...")
+    if st.button("Generate AI insights"):
+        st.info("Analyzing reviews using AI...")
 
         resultados = {
             "nombre_producto": prompt_nombre_producto(texto_reviews),
@@ -68,7 +66,7 @@ def analizar_reviews(excel_data: pd.ExcelFile, preguntas_rufus: list[str] = []) 
             )
 
         st.session_state.resultados_mercado = resultados
-        st.success("Análisis completado.")
+        st.success("Analysis completed.")
     else:
         resultados = st.session_state.get("resultados_mercado", {})
 
