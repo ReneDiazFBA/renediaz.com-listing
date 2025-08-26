@@ -92,9 +92,12 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
             aplicar_log10_dinamico
         )
 
-        df_original = st.session_state.master_deduped.copy()
-        df_filtrado = filtrar_por_sliders(df_original)
-        df_transformado = aplicar_log10_dinamico(df_filtrado)
+        df = st.session_state.get(
+            "df_transformado") or st.session_state.get("df_filtrado")
+        if df is None:
+            st.error(
+                "No se ha generado la tabla transformada ni filtrada. Ve primero a la vista descriptiva.")
+            return
 
         columnas_numericas = df_transformado.select_dtypes(
             include=["number"]).columns.tolist()
@@ -154,9 +157,12 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
             interpretar_correlaciones
         )
 
-        df_original = st.session_state.master_deduped.copy()
-        df_filtrado = filtrar_por_sliders(df_original)
-        df_transformado = aplicar_log10_dinamico(df_filtrado)
+        df = st.session_state.get(
+            "df_transformado") or st.session_state.get("df_filtrado")
+        if df is None:
+            st.error(
+                "No se ha generado la tabla transformada ni filtrada. Ve primero a la vista descriptiva.")
+            return
 
         pearson, spearman = calcular_correlaciones(df_transformado)
 
@@ -204,9 +210,12 @@ def mostrar_keywords_estadistica(excel_data: Optional[pd.ExcelFile] = None):
             realizar_tests_inferenciales
         )
 
-        df_original = st.session_state.master_deduped.copy()
-        df_filtrado = filtrar_por_sliders(df_original)
-        df_transformado = aplicar_log10_dinamico(df_filtrado)
+        df = st.session_state.get(
+            "df_transformado") or st.session_state.get("df_filtrado")
+        if df is None:
+            st.error(
+                "No se ha generado la tabla transformada ni filtrada. Ve primero a la vista descriptiva.")
+            return
 
         st.subheader("Comparación de métricas con pruebas inferenciales")
         st.caption(
