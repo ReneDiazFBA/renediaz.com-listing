@@ -142,10 +142,11 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                     excel_data, atributos_mercado
                 )
 
-                if resultados_contraste is None or not any(resultados_contraste.values()):
+                if resultados_contraste is None or not any(resultados_contraste.values):
                     st.warning(
                         "No se encontraron atributos relevantes en CustData.")
                 else:
+
                     st.markdown(
                         "#### Atributos valorados por el mercado pero ausentes en el cliente")
                     for a in resultados_contraste["Atributos valorados por el mercado pero no presentes en cliente"]:
