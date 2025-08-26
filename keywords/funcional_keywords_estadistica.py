@@ -54,18 +54,22 @@ def imputar_valores_vacios(df: pd.DataFrame) -> pd.DataFrame:
 def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
     """
     Aplica filtros tipo slider para columnas numéricas.
-    - -2 siempre se muestra.
-    - -1 se filtra solo si el checkbox está activado.
-    - Slider aplica solo sobre valores >= 0.
+    - -2 siempre se mantiene visible.
+    - -1 se mantiene salvo que el usuario decida excluirlo.
+    El rango del slider solo aplica a valores >= 0.
+    Devuelve df filtrado, ya imputado.
     """
+    from keywords.funcional_keywords_estadistica import imputar_valores_vacios
+
     df = imputar_valores_vacios(df)
     df_filtrado = df.copy()
 
-    columnas_numericas = df_filtrado.select_dtypes(
-        include=["number"]).columns.tolist()
+    columnas_numericas = [
+        c for c in df_filtrado.columns if pd.api.types.is_numeric_dtype(df_filtrado[c])]
     if not columnas_numericas:
         st.info("No hay columnas numéricas para filtrar.")
-        return df_filtrado
+        st.session_state["df_filtrado"] = df_filtrado.reset_index(drop=True)
+        return st.session_state["df_filtrado"]
 
     st.markdown("### Filtros dinámicos")
 
@@ -76,6 +80,7 @@ def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
 
         col_validos = col_data[col_data >= 0]
         if col_validos.empty:
+            filtros.append((col_data == -1) | (col_data == -2))
             continue
 
         min_val = float(col_validos.min())
@@ -88,7 +93,6 @@ def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
             key=f"check_{col}"
         )
 
-        # Protección contra sliders sin rango
         if min_val == max_val:
             rango = (min_val, max_val)
         else:
@@ -101,10 +105,7 @@ def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
                 key=f"slider_{col}"
             )
 
-        filtro_col = (
-            (col_data == -2) |
-            (col_data.between(rango[0], rango[1]))
-        )
+        filtro_col = (col_data == -2) | col_data.between(rango[0], rango[1])
 
         if not excluir_faltantes:
             filtro_col |= (col_data == -1)
@@ -117,6 +118,8 @@ def filtrar_por_sliders(df: pd.DataFrame) -> pd.DataFrame:
             filtro_total &= f
         df_filtrado = df_filtrado[filtro_total]
 
+    df_filtrado = df_filtrado.reset_index(drop=True)
+    st.session_state["df_filtrado"] = df_filtrado  # ✅ Ya imputado
     return df_filtrado
 
 
