@@ -124,23 +124,17 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
         if excel_data is None:
             st.warning("Primero debes subir un archivo Excel en la sección Datos.")
         else:
+            # Obtener tokens diferenciadores (desde análisis de IA)
             resultados = st.session_state.get("resultados_mercado", {})
             atributos_raw = resultados.get("tokens_diferenciadores", "")
 
             if not atributos_raw:
                 st.warning("No se encontraron tokens de IA. Se usarán tokens de prueba para depurar.")
-                atributos_raw = """
-                durable
-                lightweight
-                compact
-                waterproof
-                foldable
-                """
-            # Convertir texto a lista de atributos
-            atributos_mercado = [
-                x.strip().lower()
-                for x in atributos_raw.split("\n") if x.strip()
-            ]
+                atributos_mercado = ["color", "material", "durability", "non-toxic", "wooden"]
+            else:
+                atributos_mercado = [
+                    x.strip().lower() for x in atributos_raw.split("\n") if x.strip()
+                ]
 
             from mercado.funcional_mercado_contraste import comparar_atributos_mercado_cliente
 
@@ -149,20 +143,17 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                     excel_data, atributos_mercado
                 )
             except Exception as e:
-                st.error(f"Error al procesar comparación: {e}")
-                return
+                st.error(f"Error al ejecutar comparación: {e}")
+                resultados_contraste = {}
 
-            # 🔎 Validación segura: comprobar que hay contenido real
-            try:
-                valores = list(resultados_contraste.values())
-                vacio = all((len(v) == 0 or (isinstance(v, np.ndarray) and v.size == 0)) for v in valores)
-            except Exception as e:
-                st.error(f"Error al validar contenido de resultados: {e}")
-                return
-
-            if resultados_contraste is None or vacio:
+            # DEBUG: Mostrar claves y tamaños si algo falla
+            if not resultados_contraste or not any([
+                isinstance(v, list) and len(v) > 0 for v in resultados_contraste.values()
+            ]):
                 st.warning("No se encontraron atributos relevantes en CustData.")
+                st.json(resultados_contraste)
             else:
+                st.success("Comparación completada correctamente.")
                 st.markdown("#### Atributos valorados por el mercado pero ausentes en el cliente")
                 for a in resultados_contraste.get("Atributos valorados por el mercado pero no presentes en cliente", []):
                     st.markdown(f"- ❗️**{a}**")
@@ -170,9 +161,3 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                 st.markdown("#### Atributos declarados por cliente pero ignorados por el mercado")
                 for a in resultados_contraste.get("Atributos declarados por cliente pero ignorados por el mercado", []):
                     st.markdown(f"- ℹ️ **{a}**")
-
-                # Debug opcional controlado
-                with st.expander("🧪 Debug: datos internos de contraste", expanded=False):
-                    for k, v in resultados_contraste.items():
-                        st.markdown(f"**{k}**")
-                        st.code(", ".join(map(str, v)) if isinstance(v, (list, np.ndarray)) else str(v))
