@@ -106,6 +106,12 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                     key="tabla_editable_contraste"
                 )
 
+            from mercado.loader_inputs_listing import construir_inputs_listing
+            # Guardar en session_state para la vista final
+            resultados = st.session_state.get("resultados_mercado", {})
+            st.session_state["inputs_para_listing"] = construir_inputs_listing(
+                resultados, edited)
+
     elif subvista == "editorial":
         st.subheader("Léxico Editorial extraído de los reviews")
 
