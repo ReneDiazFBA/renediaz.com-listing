@@ -76,7 +76,7 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
             resultados = st.session_state.get("resultados_mercado", {})
             atributos_raw = resultados.get("atributos_valorados", "")
 
-            if not atributos_raw:
+            if not atributos_raw or not isinstance(atributos_raw, str):
                 st.warning(
                     "No se encontraron atributos valorados por IA. Se usarán atributos de prueba.")
                 atributos_mercado = ["color", "weight",
@@ -84,15 +84,19 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
             else:
                 atributos_mercado = [
                     x.strip("-• ").lower()
-                    for x in atributos_raw.split("\n") if x.strip()
+                    for x in atributos_raw.split("\n") if isinstance(x, str) and x.strip()
                 ]
 
             from mercado.funcional_mercado_contraste import comparar_atributos_mercado_cliente
 
-            df_edit = comparar_atributos_mercado_cliente(
-                excel_data, atributos_mercado)
+            try:
+                df_edit = comparar_atributos_mercado_cliente(
+                    excel_data, atributos_mercado)
+            except Exception as e:
+                st.error(f"Error al generar tabla de contraste: {e}")
+                return
 
-            if df_edit.empty:
+            if df_edit is None or df_edit.empty:
                 st.warning(
                     "No se encontraron atributos relevantes en CustData.")
             else:
@@ -105,12 +109,6 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                     hide_index=True,
                     key="tabla_editable_contraste"
                 )
-
-            from mercado.loader_inputs_listing import construir_inputs_listing
-            # Guardar en session_state para la vista final
-            resultados = st.session_state.get("resultados_mercado", {})
-            st.session_state["inputs_para_listing"] = construir_inputs_listing(
-                resultados, edited)
 
     elif subvista == "editorial":
         st.subheader("Léxico Editorial extraído de los reviews")

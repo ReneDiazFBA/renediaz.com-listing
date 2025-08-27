@@ -1,14 +1,8 @@
-# mercado/loader_inputs_listing.py
-
 import streamlit as st
 import pandas as pd
 
 
 def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.DataFrame:
-    """
-    Combina todos los outputs del análisis de reviews (resultados_mercado) y la tabla de contraste (df_edit)
-    en un solo DataFrame estructurado para el módulo de Listing.
-    """
     data = []
 
     # Nombre del producto
@@ -29,7 +23,7 @@ def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.Data
             "Fuente": "Reviews"
         })
 
-    # Beneficios (bullet points)
+    # Beneficios
     for linea in resultados.get("beneficios", "").split("\n"):
         linea = linea.strip("-• ").strip()
         if linea:
@@ -103,46 +97,39 @@ def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.Data
             "Fuente": "IA"
         })
 
-    # Tokens diferenciadores (opcional)
-    for linea in resultados.get("tokens_diferenciadores", "").split("\n"):
-        linea = linea.strip("-• ").strip()
-        if linea:
-            data.append({
-                "Tipo": "Token diferenciador",
-                "Contenido": linea,
-                "Etiqueta": "",
-                "Fuente": "Reviews"
-            })
-
-    # Atributos IA + Variaciones desde la tabla editable
-    for _, row in df_edit.iterrows():
-        atributo = row.get("Atributo IA", "").strip()
-        if atributo:
-            data.append({
-                "Tipo": "Atributo",
-                "Contenido": atributo,
-                "Etiqueta": "",
-                "Fuente": "IA"
-            })
-            for col in row.index:
-                if col.startswith("Valor") and pd.notna(row[col]):
-                    variacion = str(row[col]).strip()
-                    if variacion:
-                        data.append({
-                            "Tipo": "Variación",
-                            "Contenido": variacion,
-                            "Etiqueta": atributo,
-                            "Fuente": "IA"
-                        })
+    # Atributos IA + Variaciones desde tabla editable
+    if df_edit is not None and not df_edit.empty:
+        for _, row in df_edit.iterrows():
+            atributo = row.get("Atributo IA")
+            if isinstance(atributo, str) and atributo.strip():
+                atributo = atributo.strip()
+                data.append({
+                    "Tipo": "Atributo",
+                    "Contenido": atributo,
+                    "Etiqueta": "",
+                    "Fuente": "IA"
+                })
+                for col in row.index:
+                    if col.startswith("Valor") and pd.notna(row[col]):
+                        variacion = str(row[col]).strip()
+                        if variacion:
+                            data.append({
+                                "Tipo": "Variación",
+                                "Contenido": variacion,
+                                "Etiqueta": atributo,
+                                "Fuente": "IA"
+                            })
 
     df = pd.DataFrame(data)
-    df = df.dropna(how='all')
-    return df
+    return df.dropna(how="all")
 
 
 def cargar_inputs_para_listing() -> pd.DataFrame:
     """
-    Devuelve el DataFrame final estructurado para el módulo de Listing.
-    Si aún no ha sido generado, retorna un DataFrame vacío.
+    Retorna la tabla final construida si existe en sesión.
     """
-    return st.session_state.get("inputs_para_listing", pd.DataFrame())
+    df = st.session_state.get("inputs_para_listing", None)
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        return df
+    else:
+        return pd.DataFrame()
