@@ -35,33 +35,34 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
             from mercado.funcional_mercado_reviews import analizar_reviews
 
             datos = cargar_data_cliente(excel_data)
-
-            if st.button("Simular insights sin IA"):
-                resultados = {
-                    "nombre_producto": "Wine Chiller de Acero Inoxidable con Doble Pared",
-                    "descripcion": "Mantiene tu vino frío por horas sin necesidad de hielo. Diseño elegante y funcional.",
-                    "beneficios": "- Mantiene temperatura ideal\n- Diseño elegante\n- Fácil de transportar\n- Material duradero\n- Ideal para exteriores",
-                    "buyer_persona": "Amantes del vino que buscan comodidad, estética y funcionalidad para reuniones sociales.",
-                    "pros_cons": "PROS:\n- Muy bonito visualmente\n- Mantiene el vino frío por horas\n- Fácil de limpiar\nCONS:\n- No incluye tapa\n- Puede rayarse con facilidad",
-                    "emociones": "- Satisfacción\n- Relajación\n- Elegancia\n- Estilo\n- Confianza",
-                    "atributos_valorados": "- Color\n- Material\n- Doble pared\n- Acabado\n- Peso\n- Altura",
-                    "tokens_diferenciadores": "",  # Eliminado del flujo, solo para evitar errores
-                    "lexico_editorial": "Elegantly crafted • Sleek stainless steel • Outdoor-friendly • Chill without ice • Impress your guests",
-                    "visuales": "Mostrar el producto en una cena elegante al aire libre, con copas de vino y una mesa decorada con velas. Usar close-up del acero pulido."
+        if st.button("Simular insights sin IA"):
+            resultados = {
+                "nombre_producto": "Privacy Folders para Estudiantes – Paneles de Escritorio",
+                "descripcion": "Separadores plegables de cartón para mejorar la concentración y privacidad durante pruebas o tareas escolares.",
+                "beneficios": "- Reduce distracciones en el aula\n- Ideal para exámenes\n- Ligero y fácil de almacenar\n- Fomenta la concentración\n- Económico y reutilizable",
+                "buyer_persona": "Profesores de primaria que buscan herramientas económicas para mejorar el enfoque de sus estudiantes durante actividades evaluativas.",
+                "pros_cons": "PROS:\n- Fácil de usar\n- Mejora la concentración\n- Buena relación calidad/precio\nCONS:\n- Puede doblarse con el uso\n- No resiste humedad",
+                "emociones": "- Enfoque\n- Orden\n- Tranquilidad\n- Autoridad\n- Control",
+                "atributos_valorados": "- Material\n- Tamaño\n- Plegable\n- Color neutro\n- Reutilizable",
+                "tokens_diferenciadores": "",  # Eliminado del flujo pero necesario para evitar error
+                "lexico_editorial": "Quiet learning • Focused environment • Classroom control • Reusable cardboard panels • Budget-friendly solution",
+                "visuales": "Mostrar a varios estudiantes sentados en escritorios individuales con los privacy folders abiertos durante una prueba, ambiente ordenado y silencioso."
             }
 
             st.session_state["resultados_mercado"] = resultados
             st.success("Simulación cargada con éxito.")
 
+
             #if st.button("Generate AI insights"):
                 #st.info("Analizando reviews con IA...")
                 #resultados = analizar_reviews(
-                    #excel_data, datos.get("preguntas_rufus", []))
+                #excel_data, datos.get("preguntas_rufus", []))
                 #st.session_state["resultados_mercado"] = resultados
                 #st.success("Análisis completado.")
             #else:
                 #resultados = st.session_state.get("resultados_mercado", {})
 
+            resultados = st.session_state.get("resultados_mercado", {})
             if resultados:
                 st.markdown(
                     f"**Nombre del producto:** {resultados['nombre_producto']}")
