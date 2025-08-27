@@ -102,13 +102,20 @@ REVIEWS:
 
 
 def prompt_visual_suggestions(texto: str) -> str:
-    return _call(f"""Based on these reviews, suggest visual directions for the product listing (images, A+ content): 
-color preferences, materials, usage context, desired aesthetic.
+    return _call(f"""Based on the following Amazon product reviews, create a visual identity and branding brief for this product, aligned with the buyer persona.
+
+Include:
+1. Suggested color palette (aligned with emotion and user expectations).
+2. Recommended typography style (e.g., clean, handwritten, playful, elegant).
+3. Visual tone and design direction (e.g., minimalist, eco, fun, luxury, vintage).
+4. Appropriate imagery themes or aesthetic (e.g., lifestyle, nature, icons, illustrations).
+5. Elements to avoid visually (if any patterns or dislikes are found in reviews).
+
+Format your answer clearly with section headers in English.
 
 REVIEWS:
 {texto}
-""")
-
+""", temp=0.6)
 
 def prompt_tokens_diferenciadores(texto: str) -> str:
     return _call(f"""From the following product reviews, extract two separate lists of tokens or short key phrases:
