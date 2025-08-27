@@ -14,7 +14,8 @@ from mercado.prompts_mercado_reviews import (
     prompt_lexico_editorial,
     prompt_visual_suggestions,
     prompt_tokens_diferenciadores,
-    prompt_validar_preguntas_rufus
+    prompt_validar_preguntas_rufus,
+    prompt_atributos_valorados
 )
 
 
