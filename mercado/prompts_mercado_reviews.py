@@ -117,6 +117,7 @@ REVIEWS:
 {texto}
 """, temp=0.6)
 
+
 def prompt_tokens_diferenciadores(texto: str) -> str:
     return _call(f"""From the following product reviews, extract two separate lists of tokens or short key phrases:
 
