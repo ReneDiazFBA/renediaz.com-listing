@@ -136,6 +136,7 @@ def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.Data
                         })
 
     df = pd.DataFrame(data)
+    df = df.dropna(how='all')
     return df
 
 
