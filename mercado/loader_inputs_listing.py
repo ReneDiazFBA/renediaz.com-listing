@@ -1,0 +1,138 @@
+# mercado/loader_inputs_listing.py
+
+import pandas as pd
+
+
+def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.DataFrame:
+    """
+    Combina todos los outputs del análisis de reviews (resultados_mercado) y la tabla de contraste (df_edit)
+    en un solo DataFrame estructurado para el módulo de Listing.
+    """
+    data = []
+
+    # Nombre del producto
+    if nombre := resultados.get("nombre_producto"):
+        data.append({
+            "Tipo": "Nombre sugerido",
+            "Contenido": nombre.strip(),
+            "Etiqueta": "",
+            "Fuente": "Reviews"
+        })
+
+    # Descripción
+    if descripcion := resultados.get("descripcion"):
+        data.append({
+            "Tipo": "Descripción breve",
+            "Contenido": descripcion.strip(),
+            "Etiqueta": "",
+            "Fuente": "Reviews"
+        })
+
+    # Beneficios (bullet points)
+    for linea in resultados.get("beneficios", "").split("\n"):
+        linea = linea.strip("-• ").strip()
+        if linea:
+            data.append({
+                "Tipo": "Beneficio",
+                "Contenido": linea,
+                "Etiqueta": "Positivo",
+                "Fuente": "Reviews"
+            })
+
+    # Buyer persona
+    if persona := resultados.get("buyer_persona"):
+        data.append({
+            "Tipo": "Buyer persona",
+            "Contenido": persona.strip(),
+            "Etiqueta": "",
+            "Fuente": "Reviews"
+        })
+
+    # Pros / Cons
+    pros_cons_raw = resultados.get("pros_cons", "")
+    if "PROS:" in pros_cons_raw.upper():
+        secciones = pros_cons_raw.split("CONS:")
+        pros = secciones[0].replace("PROS:", "").split("\n")
+        cons = secciones[1].split("\n") if len(secciones) > 1 else []
+        for linea in pros:
+            linea = linea.strip("-• ").strip()
+            if linea:
+                data.append({
+                    "Tipo": "Beneficio",
+                    "Contenido": linea,
+                    "Etiqueta": "PRO",
+                    "Fuente": "Reviews"
+                })
+        for linea in cons:
+            linea = linea.strip("-• ").strip()
+            if linea:
+                data.append({
+                    "Tipo": "Obstáculo",
+                    "Contenido": linea,
+                    "Etiqueta": "CON",
+                    "Fuente": "Reviews"
+                })
+
+    # Emociones
+    for linea in resultados.get("emociones", "").split("\n"):
+        linea = linea.strip("-• ").strip()
+        if linea:
+            data.append({
+                "Tipo": "Emoción",
+                "Contenido": linea,
+                "Etiqueta": "",
+                "Fuente": "Reviews"
+            })
+
+    # Léxico editorial
+    if lexico := resultados.get("lexico_editorial"):
+        data.append({
+            "Tipo": "Léxico editorial",
+            "Contenido": lexico.strip(),
+            "Etiqueta": "",
+            "Fuente": "Reviews"
+        })
+
+    # Visuales
+    if visual := resultados.get("visuales"):
+        data.append({
+            "Tipo": "Visual",
+            "Contenido": visual.strip(),
+            "Etiqueta": "",
+            "Fuente": "IA"
+        })
+
+    # Tokens diferenciadores (opcional)
+    for linea in resultados.get("tokens_diferenciadores", "").split("\n"):
+        linea = linea.strip("-• ").strip()
+        if linea:
+            data.append({
+                "Tipo": "Token diferenciador",
+                "Contenido": linea,
+                "Etiqueta": "",
+                "Fuente": "Reviews"
+            })
+
+    # Atributos IA + Variaciones desde la tabla editable
+    for _, row in df_edit.iterrows():
+        atributo = row.get("Atributo IA", "").strip()
+        if atributo:
+            data.append({
+                "Tipo": "Atributo",
+                "Contenido": atributo,
+                "Etiqueta": "",
+                "Fuente": "IA"
+            })
+            for col in row.index:
+                if col.startswith("Valor") and pd.notna(row[col]):
+                    variacion = str(row[col]).strip()
+                    if variacion:
+                        data.append({
+                            "Tipo": "Variación",
+                            "Contenido": variacion,
+                            "Etiqueta": atributo,
+                            "Fuente": "IA"
+                        })
+
+    df = pd.DataFrame(data)
+    return df
