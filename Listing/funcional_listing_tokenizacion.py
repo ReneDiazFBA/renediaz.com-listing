@@ -1,86 +1,10 @@
-import streamlit as st
-import pandas as pd
-import re
-
-from listing.loader_listing_keywords import get_tiers_table
-
-
-def get_stopwords_from_excel() -> set:
+def priorizar_tokens(
+    cuartiles_directa: list,
+    cuartiles_especial: list,
+    cuartiles_diferenciacion: list
+) -> pd.DataFrame:
     """
-    Carga la columna B de la hoja Avoids como set de stopwords. Requiere que excel_data esté en sesión.
-    """
-    if "excel_data" not in st.session_state:
-        st.warning("No se encontró el archivo Excel en sesión.")
-        return set()
-
-    try:
-        df_avoids = st.session_state["excel_data"].parse("Avoids", skiprows=2)
-        palabras = df_avoids.iloc[:, 1].dropna().astype(
-            str).str.strip().str.lower()
-        return set(palabras)
-    except Exception as e:
-        st.error(f"No se pudieron leer las stopwords desde 'Avoids': {e}")
-        return set()
-
-
-def limpiar_texto(texto: str, stopwords: set) -> list:
-    """
-    Limpieza básica: lower, quitar símbolos, quitar stopwords, dividir en tokens.
-    """
-    if not isinstance(texto, str):
-        return []
-
-    texto = texto.lower()
-    texto = re.sub(r"[^a-z0-9\s]", " ", texto)
-    tokens = [t.strip()
-              for t in texto.split() if t.strip() and t not in stopwords]
-    return tokens
-
-
-def tokenizar_keywords() -> pd.DataFrame:
-    """
-    Carga la tabla estratégica (tiers), aplica tokenización y devuelve nueva tabla con columna 'tokens'.
-    """
-    df = get_tiers_table()
-    if df.empty:
-        return pd.DataFrame()
-
-    stopwords = get_stopwords_from_excel()
-
-    df = df.copy()
-
-    # Asegurar columnas necesarias
-    columnas_necesarias = ["Search Terms",
-                           "Search Volume", "Clasificación Estrategia"]
-    for col in columnas_necesarias:
-        if col not in df.columns:
-            st.error(
-                f"Falta la columna obligatoria '{col}' en la matriz de tiers.")
-            return pd.DataFrame()
-
-    # Estandarizar columna para que el resto del módulo use siempre "tier"
-    df["tier"] = df["Clasificación Estrategia"]
-    # Normalizar nombres de tier para compatibilidad con lógica de priorización
-    reemplazos = {
-        "Core keyword": "Core",
-        "Oportunidad crítica (subnicho+nicho)": "Oportunidad crítica",
-        "Oportunidad directa (subnicho)": "Oportunidad directa",
-        "Especialización (ASIN + subnicho)": "Especialización",
-        "Diferenciación (ASIN + nicho)": "Diferenciación",
-        "Outlier útil (ASIN)": "Outlier",
-        "Oportunidad lejana (nicho)": "Oportunidad lejana",
-        "Irrelevante total": "Irrelevante"
-    }
-    df["tier"] = df["tier"].replace(reemplazos)
-
-    df["tokens"] = df["Search Terms"].apply(
-        lambda x: limpiar_texto(x, stopwords))
-    return df
-
-
-def priorizar_tokens() -> pd.DataFrame:
-    """
-    Construye listado de tokens únicos priorizados por tier estratégico y volumen.
+    Construye listado de tokens únicos priorizados por tier estratégico, volumen y cuartiles seleccionados.
     """
     df = tokenizar_keywords()
     if df.empty or "tier" not in df.columns:
@@ -99,19 +23,31 @@ def priorizar_tokens() -> pd.DataFrame:
             return None
 
     df["cuartil"] = None
-    for tier_objetivo in ["Oportunidad directa", "Especialización"]:
+    for tier_objetivo in ["Oportunidad directa", "Especialización", "Diferenciación"]:
         mask = df["tier"] == tier_objetivo
-        if mask.sum() > 4:  # al menos 4 valores para qcut
+        if mask.sum() > 4:
             df.loc[mask, "cuartil"] = df[mask].apply(
                 lambda x: asignar_q(x, df[mask]["Search Volume"]), axis=1)
 
-    # Reglas de inclusión
+    # Mapeo de etiquetas legibles
+    mapa_cuartiles = {
+        "Q1": "Bottom 25%",
+        "Q2": "Medio 50%",
+        "Q3": "Top 50%",
+        "Q4": "Top 25%"
+    }
+
     def es_valido(row):
-        if row["tier"] in ["Core", "Oportunidad crítica"]:
+        tier = row["tier"]
+        cuartil_legible = mapa_cuartiles.get(str(row.get("cuartil")), None)
+
+        if tier in ["Core", "Oportunidad crítica"]:
             return True
-        if row["tier"] == "Oportunidad directa" and row["cuartil"] in ["Q3", "Q4"]:
+        if tier == "Oportunidad directa" and cuartil_legible in cuartiles_directa:
             return True
-        if row["tier"] == "Especialización" and row["cuartil"] == "Q4":
+        if tier == "Especialización" and cuartil_legible in cuartiles_especial:
+            return True
+        if tier == "Diferenciación" and cuartil_legible in cuartiles_diferenciacion:
             return True
         return False
 
@@ -122,7 +58,8 @@ def priorizar_tokens() -> pd.DataFrame:
         "Core": 1,
         "Oportunidad crítica": 2,
         "Oportunidad directa": 3,
-        "Especialización": 4
+        "Especialización": 4,
+        "Diferenciación": 5
     }
 
     df_filtrada["tokens"] = df_filtrada["tokens"].apply(
@@ -136,7 +73,6 @@ def priorizar_tokens() -> pd.DataFrame:
 
     df_tokens = pd.DataFrame(registros, columns=["token", "tier"])
 
-    # Prioridad y frecuencia
     df_tokens["prioridad"] = df_tokens["tier"].map(prioridad)
     df_tokens.sort_values("prioridad", inplace=True)
 

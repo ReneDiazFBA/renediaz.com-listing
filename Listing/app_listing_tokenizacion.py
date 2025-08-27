@@ -1,8 +1,8 @@
-# listing/app_listing_tokenizacion.py
-
-from listing.funcional_listing_tokenizacion import priorizar_tokens
 import streamlit as st
-from listing.funcional_listing_tokenizacion import tokenizar_keywords
+from listing.funcional_listing_tokenizacion import (
+    tokenizar_keywords,
+    priorizar_tokens
+)
 
 
 def mostrar_listing_tokenizacion(excel_data=None):
@@ -15,26 +15,54 @@ def mostrar_listing_tokenizacion(excel_data=None):
         return
 
     st.caption("Vista previa de tokens generados por término:")
-    st.dataframe(df[["Search Terms", "tokens"]], use_container_width=True)
+    st.dataframe(df[["Search Terms", "tokens", "tier"]],
+                 use_container_width=True)
 
-# listing/app_listing_tokenizacion.py
 
-
-def mostrar_listing_tokenizacion(excel_data=None):
+def mostrar_tokens_priorizados(excel_data=None):
     st.subheader("Tokenización priorizada de keywords estratégicas")
 
-    df_tokens = priorizar_tokens()
+    # UI para filtros de cuartiles y diferenciación
+    cuartiles_directa = st.multiselect(
+        "Cuartiles a incluir — Oportunidad directa",
+        options=["Top 25%", "Top 50%", "Medio 50%", "Bottom 25%"],
+        default=["Top 25%", "Top 50%"]
+    )
+
+    cuartiles_especial = st.multiselect(
+        "Cuartiles a incluir — Especialización",
+        options=["Top 25%", "Top 50%", "Medio 50%", "Bottom 25%"],
+        default=["Top 25%"]
+    )
+
+    incluir_diferenciacion = st.checkbox(
+        "¿Incluir tier: Diferenciación?", value=False)
+
+    cuartiles_diferenciacion = []
+    if incluir_diferenciacion:
+        cuartiles_diferenciacion = st.multiselect(
+            "Cuartiles a incluir — Diferenciación",
+            options=["Top 25%", "Top 50%", "Medio 50%", "Bottom 25%"],
+            default=["Top 25%"]
+        )
+
+    # Ejecutar priorización
+    df_tokens = priorizar_tokens(
+        cuartiles_directa,
+        cuartiles_especial,
+        cuartiles_diferenciacion if incluir_diferenciacion else []
+    )
 
     if df_tokens.empty:
         st.warning("No se pudo generar el listado de tokens priorizados.")
         return
 
-    # Ordenar por prioridad jerárquica (tier_origen)
     orden_tiers = {
         "Core": 1,
         "Oportunidad crítica": 2,
         "Oportunidad directa": 3,
-        "Especialización": 4
+        "Especialización": 4,
+        "Diferenciación": 5
     }
 
     df_tokens["orden"] = df_tokens["tier_origen"].map(orden_tiers)
