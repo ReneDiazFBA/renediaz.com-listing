@@ -18,13 +18,14 @@ def comparar_atributos_mercado_cliente(excel_data: pd.ExcelFile, atributos_ia: l
     # Ignorar filas completamente vacías
     df = df.dropna(how="all")
 
-    if df.shape[1] < 3:
+    if df.shape[1] < 4:
         st.warning("No hay suficientes columnas en CustData.")
         return pd.DataFrame()
 
+    # Ajustar nombres de columnas (hay una columna vacía al inicio que se ignora)
     col_total = df.shape[1]
-    columnas = ["Atributo", "Relevante", "Variacion"] + \
-        [f"Valor_{i}" for i in range(1, col_total - 3 + 1)]
+    columnas = ["_IGN", "Atributo", "Relevante", "Variacion"] + \
+        [f"Valor_{i}" for i in range(1, col_total - 4 + 1)]
     df.columns = columnas
 
     # Filtrar donde Relevante = "si"
@@ -49,3 +50,4 @@ def comparar_atributos_mercado_cliente(excel_data: pd.ExcelFile, atributos_ia: l
 
     df_editable = pd.DataFrame(data)
     return df_editable
+
