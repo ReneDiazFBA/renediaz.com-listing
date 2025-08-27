@@ -1,73 +1,50 @@
+# listing/app_listing_datos.py
+
 import streamlit as st
-from listing.funcional_listing_tokenizacion import (
-    tokenizar_keywords,
-    priorizar_tokens
+from typing import Optional
+
+from listing.app_listing_tokenizacion import (
+    mostrar_listing_tokenizacion,
+    mostrar_tokens_priorizados
 )
 
 
-def mostrar_listing_tokenizacion(excel_data=None):
-    st.subheader("Tokenización de Keywords Estratégicas")
+def mostrar_listing(excel_data: Optional[object] = None):
+    st.title("ReneDiaz.com Dashboard — Listing")
+    st.caption("Tokenización, copywriting, visuales, Brand Story y A+.")
 
-    df = tokenizar_keywords()
-
-    if df.empty:
-        st.warning("No se pudo cargar la tabla de keywords tokenizadas.")
-        return
-
-    st.caption("Vista previa de tokens generados por término:")
-    st.dataframe(df[["Search Terms", "tokens", "tier"]],
-                 use_container_width=True)
-
-
-def mostrar_tokens_priorizados(excel_data=None):
-    st.subheader("Tokenización priorizada de keywords estratégicas")
-
-    # UI para filtros de cuartiles y diferenciación
-    cuartiles_directa = st.multiselect(
-        "Cuartiles a incluir — Oportunidad directa",
-        options=["Top 25%", "Top 50%", "Medio 50%", "Bottom 25%"],
-        default=["Top 25%", "Top 50%"]
+    subvista = st.radio(
+        "Secciones disponibles:",
+        options=["tokenizacion", "copywrite",
+                 "imagenes", "brandstory", "aplus"],
+        format_func=lambda x: {
+            "tokenizacion": "Tokenización",
+            "copywrite": "Copywriting",
+            "imagenes": "Imágenes",
+            "brandstory": "Brand Story",
+            "aplus": "A+ Content"
+        }.get(x, x),
+        horizontal=True,
+        key="nav_listing"
     )
 
-    cuartiles_especial = st.multiselect(
-        "Cuartiles a incluir — Especialización",
-        options=["Top 25%", "Top 50%", "Medio 50%", "Bottom 25%"],
-        default=["Top 25%"]
-    )
+    st.divider()
 
-    incluir_diferenciacion = st.checkbox(
-        "¿Incluir tier: Diferenciación?", value=False)
-
-    cuartiles_diferenciacion = []
-    if incluir_diferenciacion:
-        cuartiles_diferenciacion = st.multiselect(
-            "Cuartiles a incluir — Diferenciación",
-            options=["Top 25%", "Top 50%", "Medio 50%", "Bottom 25%"],
-            default=["Top 25%"]
-        )
-
-    # Ejecutar priorización
-    df_tokens = priorizar_tokens(
-        cuartiles_directa,
-        cuartiles_especial,
-        cuartiles_diferenciacion if incluir_diferenciacion else []
-    )
-
-    if df_tokens.empty:
-        st.warning("No se pudo generar el listado de tokens priorizados.")
-        return
-
-    orden_tiers = {
-        "Core": 1,
-        "Oportunidad crítica": 2,
-        "Oportunidad directa": 3,
-        "Especialización": 4,
-        "Diferenciación": 5
-    }
-
-    df_tokens["orden"] = df_tokens["tier_origen"].map(orden_tiers)
-    df_tokens.sort_values(["orden", "token"], inplace=True)
-
-    st.caption("Tokens únicos priorizados por tier estratégico. Si un token aparece más de una vez, se muestra su frecuencia.")
-    st.dataframe(
-        df_tokens[["token", "frecuencia", "tier_origen"]], use_container_width=True)
+    if subvista == "tokenizacion":
+        mostrar_listing_tokenizacion(excel_data)
+        st.divider()
+        mostrar_tokens_priorizados(excel_data)
+    elif subvista == "copywrite":
+        from listing.app_listing_copywrite import mostrar_listing_copywrite
+        mostrar_listing_copywrite(excel_data)
+    elif subvista == "imagenes":
+        from listing.app_listing_imagenes import mostrar_listing_imagenes
+        mostrar_listing_imagenes(excel_data)
+    elif subvista == "brandstory":
+        from listing.app_listing_brandstory import mostrar_listing_brandstory
+        mostrar_listing_brandstory(excel_data)
+    elif subvista == "aplus":
+        from listing.app_listing_aplus import mostrar_listing_aplus
+        mostrar_listing_aplus(excel_data)
+    else:
+        st.error("Sección no reconocida en Listing.")
