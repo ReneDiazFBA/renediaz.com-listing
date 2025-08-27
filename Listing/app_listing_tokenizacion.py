@@ -3,7 +3,7 @@
 import streamlit as st
 from typing import Optional
 
-from listing.app_listing_tokenizacion import (
+from listing.funcional_listing_tokenizacion import (
     mostrar_listing_tokenizacion,
     mostrar_tokens_priorizados
 )
