@@ -23,24 +23,54 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
     subvista = render_subnav(default_key="insights", secciones=secciones)
     st.divider()
 
+    if subvista == "insights":
+        st.subheader("Insights del mercado (reviews)")
 
-def mostrar_analisis_mercado(excel_data: Optional[object] = None):
-    st.markdown("### Análisis del Mercado")
-    st.caption(
-        "Insights, emociones, atributos valorados, estilo editorial y visual extraídos desde los reviews.")
+        if excel_data is None:
+            st.warning(
+                "Primero debes subir un archivo Excel en la sección Datos.")
+        else:
+            from mercado.loader_data_cliente import cargar_data_cliente
+            from mercado.funcional_mercado_reviews import analizar_reviews
 
-    secciones = {
-        "insights": ("Insights de Reviews", None),
-        "cliente": ("Contraste con Cliente", None),
-        "editorial": ("Léxico Editorial", None),
-        "visual": ("Recomendaciones Visuales", None),
-        "tabla": ("Tabla Final de Inputs", None)
-    }
+            datos = cargar_data_cliente(excel_data)
 
-    subvista = render_subnav(default_key="insights", secciones=secciones)
-    st.divider()
+            if st.button("Generate AI insights"):
+                st.info("Analizando reviews con IA...")
+                resultados = analizar_reviews(
+                    excel_data, datos.get("preguntas_rufus", []))
+                st.session_state["resultados_mercado"] = resultados
+                st.success("Análisis completado.")
+            else:
+                resultados = st.session_state.get("resultados_mercado", {})
 
-    if subvista == "cliente":
+            if resultados:
+                st.markdown(
+                    f"**Nombre del producto:** {resultados['nombre_producto']}")
+                st.markdown(
+                    f"**Descripción breve:** {resultados['descripcion']}")
+                st.markdown("**Beneficios valorados:**")
+                st.markdown(resultados["beneficios"])
+                st.markdown("**Buyer persona:**")
+                st.markdown(resultados["buyer_persona"])
+                st.markdown("**Pros / Cons:**")
+                st.markdown(resultados["pros_cons"])
+                st.markdown("**Emociones detectadas:**")
+                st.markdown(resultados["emociones"])
+                st.markdown("**Léxico editorial:**")
+                st.markdown(resultados["lexico_editorial"])
+                st.markdown("**Sugerencias visuales:**")
+                st.markdown(resultados["visuales"])
+                st.markdown("**Tokens diferenciadores:**")
+                st.markdown(resultados["tokens_diferenciadores"])
+
+                if "validacion_rufus" in resultados:
+                    st.markdown("**Validación preguntas Rufus:**")
+                    st.markdown(resultados["validacion_rufus"])
+            else:
+                st.info("Haz clic en el botón para generar los insights.")
+
+    elif subvista == "cliente":
         st.subheader("Contraste con Atributos del Cliente")
 
         if excel_data is None:
