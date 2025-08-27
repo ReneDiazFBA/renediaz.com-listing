@@ -15,6 +15,9 @@ def comparar_atributos_mercado_cliente(excel_data: pd.ExcelFile, atributos_ia: l
         st.error(f"Error al leer atributos del cliente desde CustData: {e}")
         return pd.DataFrame()
 
+    # Solo tomar las filas 13 a 24 (índice 0 al 11 después del skip)
+    df = df.iloc[:12]
+
     # Ignorar filas completamente vacías
     df = df.dropna(how="all")
 
@@ -50,4 +53,3 @@ def comparar_atributos_mercado_cliente(excel_data: pd.ExcelFile, atributos_ia: l
 
     df_editable = pd.DataFrame(data)
     return df_editable
-
