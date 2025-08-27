@@ -140,5 +140,9 @@ def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.Data
     return df
 
 
-def cargar_inputs_para_listing() -> dict:
-    return st.session_state.get("inputs_para_listing", {})
+def cargar_inputs_para_listing() -> pd.DataFrame:
+    """
+    Devuelve el DataFrame final estructurado para el módulo de Listing.
+    Si aún no ha sido generado, retorna un DataFrame vacío.
+    """
+    return st.session_state.get("inputs_para_listing", pd.DataFrame())
