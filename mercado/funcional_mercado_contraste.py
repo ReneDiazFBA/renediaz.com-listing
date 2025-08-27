@@ -4,60 +4,41 @@ import pandas as pd
 import streamlit as st
 
 
-def comparar_atributos_mercado_cliente(excel_data: pd.ExcelFile, atributos_mercado: list[str]) -> tuple[pd.DataFrame, dict]:
+def comparar_atributos_mercado_cliente(excel_data: pd.ExcelFile, atributos_mercado: list[str]) -> pd.DataFrame:
     """
     Compara los atributos detectados en los reviews con los que el cliente declara tener (CustData).
-    Devuelve un DataFrame vertical y un resumen dict.
+    Devuelve un DataFrame editable con columnas IA, atributo cliente y valores.
     """
 
     try:
         df = excel_data.parse("CustData", skiprows=12, header=None)
     except Exception as e:
         st.error(f"Error al leer atributos del cliente desde CustData: {e}")
-        return pd.DataFrame(), {}
+        return pd.DataFrame()
 
     df = df.dropna(how="all")
-    st.write(f"Columnas detectadas: {df.shape[1]}")
 
     if df.shape[1] < 3:
         st.warning("No hay suficientes columnas en CustData.")
-        return pd.DataFrame(), {}
+        return pd.DataFrame()
 
-    # Asignar nombres a las columnas
+    # Renombrar columnas según cantidad real
     col_total = df.shape[1]
-    df.columns = ["Atributo", "Relevante", "Variacion"] + \
-        [f"Valor_{i}" for i in range(1, col_total - 3 + 1)]
+    columnas = ["Atributo", "Relevante", "Variacion"] + [f"Valor_{i}" for i in range(1, col_total - 3 + 1)]
+    df.columns = columnas
 
-    # Filtrar atributos válidos
+    # Filtrar solo atributos relevantes
     df = df[df["Atributo"].notna()]
-    df["Relevante"] = df["Relevante"].fillna(
-        "").astype(str).str.strip().str.lower()
-    df = df[df["Relevante"] == "si"]
-    df["Atributo"] = df["Atributo"].astype(str).str.strip().str.lower()
+    df = df[df["Relevante"].astype(str).str.lower() == "si"]
+    df["Atributo"] = df["Atributo"].astype(str).str.strip()
 
-    atributos_cliente = df["Atributo"].tolist()
-    atributos_mercado = [a.strip().lower() for a in atributos_mercado]
+    # Crear tabla editable
+    valores_cols = [col for col in df.columns if col.startswith("Valor_")]
+    df_editable = pd.DataFrame()
+    df_editable["Atributo IA (mercado)"] = atributos_mercado + [""] * max(0, len(df) - len(atributos_mercado))
+    df_editable["Atributo Cliente"] = df["Atributo"].tolist() + [""] * max(0, len(atributos_mercado) - len(df))
+    
+    for i, col in enumerate(valores_cols):
+        df_editable[f"Valor {i+1}"] = df[col].tolist() + [""] * max(0, len(atributos_mercado) - len(df))
 
-    # Comparación
-    en_mercado_no_cliente = [
-        a for a in atributos_mercado if a not in atributos_cliente]
-    en_cliente_no_mercado = [
-        a for a in atributos_cliente if a not in atributos_mercado]
-    presentes_en_ambos = [
-        a for a in atributos_mercado if a in atributos_cliente]
-
-    # DataFrame vertical para mostrar comparaciones
-    df_comparado = pd.DataFrame({
-        "Atributos del mercado": atributos_mercado,
-        "Presente en cliente": ["✅" if a in atributos_cliente else "❌" for a in atributos_mercado]
-    })
-
-    resumen = {
-        "Detectados en reviews (mercado)": atributos_mercado,
-        "Indicados por el cliente": atributos_cliente,
-        "Atributos valorados por el mercado pero no presentes en cliente": en_mercado_no_cliente,
-        "Atributos declarados por cliente pero ignorados por el mercado": en_cliente_no_mercado,
-        "Atributos presentes en ambos": presentes_en_ambos
-    }
-
-    return df_comparado, resumen
+    return df_editable
