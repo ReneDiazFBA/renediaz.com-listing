@@ -175,9 +175,6 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                     key="tabla_editable_contraste"
                 )
 
-    elif subvista == "insights":
-        st.info("Vista: Insights de reviews (IA)")
-
     elif subvista == "editorial":
         st.info("Vista: Léxico Editorial (placeholder)")
 
