@@ -36,14 +36,31 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
 
             datos = cargar_data_cliente(excel_data)
 
-            if st.button("Generate AI insights"):
-                st.info("Analizando reviews con IA...")
-                resultados = analizar_reviews(
-                    excel_data, datos.get("preguntas_rufus", []))
-                st.session_state["resultados_mercado"] = resultados
-                st.success("Análisis completado.")
-            else:
-                resultados = st.session_state.get("resultados_mercado", {})
+            if st.button("Simular insights sin IA"):
+                resultados = {
+                    "nombre_producto": "Wine Chiller de Acero Inoxidable con Doble Pared",
+                    "descripcion": "Mantiene tu vino frío por horas sin necesidad de hielo. Diseño elegante y funcional.",
+                    "beneficios": "- Mantiene temperatura ideal\n- Diseño elegante\n- Fácil de transportar\n- Material duradero\n- Ideal para exteriores",
+                    "buyer_persona": "Amantes del vino que buscan comodidad, estética y funcionalidad para reuniones sociales.",
+                    "pros_cons": "PROS:\n- Muy bonito visualmente\n- Mantiene el vino frío por horas\n- Fácil de limpiar\nCONS:\n- No incluye tapa\n- Puede rayarse con facilidad",
+                    "emociones": "- Satisfacción\n- Relajación\n- Elegancia\n- Estilo\n- Confianza",
+                    "atributos_valorados": "- Color\n- Material\n- Doble pared\n- Acabado\n- Peso\n- Altura",
+                    "tokens_diferenciadores": "",  # Eliminado del flujo, solo para evitar errores
+                    "lexico_editorial": "Elegantly crafted • Sleek stainless steel • Outdoor-friendly • Chill without ice • Impress your guests",
+                    "visuales": "Mostrar el producto en una cena elegante al aire libre, con copas de vino y una mesa decorada con velas. Usar close-up del acero pulido."
+            }
+
+            st.session_state["resultados_mercado"] = resultados
+            st.success("Simulación cargada con éxito.")
+
+            #if st.button("Generate AI insights"):
+                #st.info("Analizando reviews con IA...")
+                #resultados = analizar_reviews(
+                    #excel_data, datos.get("preguntas_rufus", []))
+                #st.session_state["resultados_mercado"] = resultados
+                #st.success("Análisis completado.")
+            #else:
+                #resultados = st.session_state.get("resultados_mercado", {})
 
             if resultados:
                 st.markdown(
