@@ -3,7 +3,8 @@
 import streamlit as st
 from listing.funcional_listing_tokenizacion import (
     tokenizar_keywords,
-    priorizar_tokens
+    priorizar_tokens,
+    lemmatizar_tokens_priorizados
 )
 
 
@@ -71,3 +72,55 @@ def mostrar_tokens_priorizados(excel_data=None):
         df_tokens[["token", "frecuencia", "tier_origen"]],
         use_container_width=True
     )
+
+
+def mostrar_tokens_lematizados(excel_data=None):
+    st.subheader("Lematización de tokens priorizados")
+
+    # Filtros de cuartiles y diferenciación
+    cuartiles_directa = st.multiselect(
+        "Cuartiles a incluir — Oportunidad directa",
+        options=["Top 25%", "Top 50%", "Medio 50%", "Bottom 25%"],
+        default=["Top 25%", "Top 50%"],
+        key="directa_lemmas"
+    )
+
+    cuartiles_especial = st.multiselect(
+        "Cuartiles a incluir — Especialización",
+        options=["Top 25%", "Top 50%", "Medio 50%", "Bottom 25%"],
+        default=["Top 25%"],
+        key="especial_lemmas"
+    )
+
+    incluir_diferenciacion = st.checkbox(
+        "¿Incluir tier: Diferenciación?", value=False, key="check_dif_lemmas"
+    )
+
+    cuartiles_diferenciacion = []
+    if incluir_diferenciacion:
+        cuartiles_diferenciacion = st.multiselect(
+            "Cuartiles a incluir — Diferenciación",
+            options=["Top 25%", "Top 50%", "Medio 50%", "Bottom 25%"],
+            default=["Top 25%"],
+            key="dif_lemmas_multiselect"
+        )
+
+    # Priorizar y lematizar tokens
+    df_tokens = priorizar_tokens(
+        cuartiles_directa,
+        cuartiles_especial,
+        cuartiles_diferenciacion if incluir_diferenciacion else []
+    )
+    if df_tokens.empty:
+        st.warning("No se pudo generar el listado de tokens priorizados.")
+        return
+
+    df_lemas = lemmatizar_tokens_priorizados(df_tokens)
+
+    if df_lemas.empty:
+        st.warning("No se pudo lematizar la lista.")
+        return
+
+    st.caption("Tokens lematizados consolidados por prioridad y frecuencia:")
+    st.dataframe(df_lemas[["token_original", "token_lema", "frecuencia", "tier_origen"]],
+                 use_container_width=True)

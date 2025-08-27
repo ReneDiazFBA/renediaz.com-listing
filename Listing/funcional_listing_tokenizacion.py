@@ -2,6 +2,7 @@
 
 import streamlit as st
 import pandas as pd
+import spacy
 import re
 
 from listing.loader_listing_keywords import get_tiers_table
@@ -204,3 +205,74 @@ def priorizar_tokens(
     )
 
     return df_resultado
+
+
+def lemmatizar_tokens_priorizados(df_tokens: pd.DataFrame) -> pd.DataFrame:
+    """
+    Aplica lematización al campo 'token' del dataframe priorizado, y agrupa por lemas.
+    Conserva la frecuencia total y el tier de mayor prioridad.
+    Devuelve un nuevo dataframe con columnas: token_original, token_lema, frecuencia, tier_origen.
+    """
+    import spacy
+
+    # Cargar modelo en inglés
+    try:
+        nlp = spacy.load("en_core_web_sm")
+    except OSError:
+        st.error("No se pudo cargar el modelo 'en_core_web_sm'. Ejecuta en terminal:\npython -m spacy download en_core_web_sm")
+        return pd.DataFrame()
+
+    # Validación
+    if df_tokens.empty or "token" not in df_tokens.columns:
+        st.warning("No hay tokens para lematizar.")
+        return pd.DataFrame()
+
+    # Mapear prioridad para conservar la más alta
+    prioridad = {
+        "Core": 1,
+        "Oportunidad crítica": 2,
+        "Oportunidad directa": 3,
+        "Especialización": 4,
+        "Diferenciación": 5,
+        "Outlier": 6,
+        "Oportunidad lejana": 7,
+        "Irrelevante": 8,
+    }
+
+    # Lemmatizar cada token
+    df_tokens["token_lema"] = df_tokens["token"].apply(
+        lambda x: nlp(x)[0].lemma_ if isinstance(x, str) and len(x) > 0 else x
+    )
+
+    # Guardar token original para visual
+    df_tokens["token_original"] = df_tokens["token"]
+
+    # Asignar prioridad numérica
+    df_tokens["prioridad"] = df_tokens["tier_origen"].map(
+        prioridad).fillna(999).astype(int)
+
+    # Agrupar por lema
+    df_grouped = (
+        df_tokens.groupby("token_lema")
+        .agg({
+            "frecuencia": "sum",
+            "token_original": lambda x: ", ".join(sorted(set(x))),
+            "prioridad": "min",
+        })
+        .reset_index()
+    )
+
+    # Volver a mapear el tier de mayor prioridad
+    prioridad_inv = {v: k for k, v in prioridad.items()}
+    df_grouped["tier_origen"] = df_grouped["prioridad"].map(prioridad_inv)
+
+    # Renombrar columnas
+    df_grouped = df_grouped.rename(columns={
+        "token_lema": "token_lema",
+        "token_original": "token_original",
+        "frecuencia": "frecuencia",
+        "tier_origen": "tier_origen"
+    })
+
+    # Orden final
+    return df_grouped[["token_original", "token_lema", "frecuencia", "tier_origen"]]
