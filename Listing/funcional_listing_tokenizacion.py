@@ -60,6 +60,18 @@ def tokenizar_keywords() -> pd.DataFrame:
 
     # Estandarizar columna para que el resto del módulo use siempre "tier"
     df["tier"] = df["Clasificación Estrategia"]
+    # Normalizar nombres de tier para compatibilidad con lógica de priorización
+    reemplazos = {
+        "Core keyword": "Core",
+        "Oportunidad crítica (subnicho+nicho)": "Oportunidad crítica",
+        "Oportunidad directa (subnicho)": "Oportunidad directa",
+        "Especialización (ASIN + subnicho)": "Especialización",
+        "Diferenciación (ASIN + nicho)": "Diferenciación",
+        "Outlier útil (ASIN)": "Outlier",
+        "Oportunidad lejana (nicho)": "Oportunidad lejana",
+        "Irrelevante total": "Irrelevante"
+    }
+    df["tier"] = df["tier"].replace(reemplazos)
 
     df["tokens"] = df["Search Terms"].apply(
         lambda x: limpiar_texto(x, stopwords))
