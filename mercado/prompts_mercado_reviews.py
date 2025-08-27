@@ -180,3 +180,18 @@ CLIENT ATTRIBUTES:
 
 Be clear and organized. Respond in English.
 """, temp=0.3)
+
+
+def prompt_atributos_valorados(texto: str) -> str:
+    return _call(f"""From the following Amazon product reviews, extract a short list of PRODUCT ATTRIBUTES that customers clearly care about or mention frequently.
+
+Only include physical or functional product attributes (e.g., color, size, material, weight, accessories, durability, etc.).
+
+**Format the output strictly as:**
+- one attribute per line
+- each line starts with a hyphen and a space (e.g., "- color")
+- no empty lines, no bullet symbols, no formatting
+
+REVIEWS:
+{texto}
+""", temp=0.3)

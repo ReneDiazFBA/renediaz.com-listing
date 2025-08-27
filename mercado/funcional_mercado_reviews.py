@@ -59,6 +59,8 @@ def analizar_reviews(excel_data: pd.ExcelFile, preguntas_rufus: list[str] = []) 
         "lexico_editorial": prompt_lexico_editorial(texto_reviews),
         "visuales": prompt_visual_suggestions(texto_reviews),
         "tokens_diferenciadores": prompt_tokens_diferenciadores(texto_reviews),
+        "atributos_valorados": prompt_atributos_valorados(texto_reviews),
+
     }
 
     if preguntas_rufus:

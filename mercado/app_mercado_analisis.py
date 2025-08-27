@@ -78,16 +78,16 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                 "Primero debes subir un archivo Excel en la sección Datos.")
         else:
             resultados = st.session_state.get("resultados_mercado", {})
-            atributos_raw = resultados.get("tokens_diferenciadores", "")
+            atributos_raw = resultados.get("atributos_valorados", "")
 
             if not atributos_raw:
                 st.warning(
-                    "No se encontraron tokens de IA. Se usarán tokens de prueba para depurar.")
+                    "No se encontraron atributos valorados por IA. Se usarán atributos de prueba.")
                 atributos_mercado = ["color", "weight",
                                      "material", "dimensions", "label", "storage"]
             else:
                 atributos_mercado = [
-                    x.strip().lower()
+                    x.strip("-• ").lower()
                     for x in atributos_raw.split("\n") if x.strip()
                 ]
 
