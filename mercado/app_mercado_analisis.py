@@ -57,8 +57,6 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                 st.markdown(resultados["pros_cons"])
                 st.markdown("**Emociones detectadas:**")
                 st.markdown(resultados["emociones"])
-                st.markdown("**Léxico editorial:**")
-                st.markdown(resultados["lexico_editorial"])
                 st.markdown("**Sugerencias visuales:**")
                 st.markdown(resultados["visuales"])
                 st.markdown("**Tokens diferenciadores:**")
@@ -111,7 +109,19 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                 )
 
     elif subvista == "editorial":
-        st.info("Vista: Léxico Editorial (placeholder)")
+        st.subheader("Léxico Editorial extraído de los reviews")
+
+        resultados = st.session_state.get("resultados_mercado", {})
+
+        if not resultados:
+            st.warning(
+                "Primero debes generar los insights en la pestaña 'Insights de Reviews'.")
+        else:
+            contenido = resultados.get("lexico_editorial", "")
+            if contenido:
+                st.markdown(contenido)
+            else:
+                st.info("No se encontró contenido de léxico editorial.")
 
     elif subvista == "visual":
         st.info("Vista: Recomendaciones Visuales (placeholder)")
