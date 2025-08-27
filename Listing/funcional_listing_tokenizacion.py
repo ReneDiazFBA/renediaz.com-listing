@@ -48,6 +48,15 @@ def tokenizar_keywords() -> pd.DataFrame:
     stopwords = get_stopwords_from_excel()
 
     df = df.copy()
+
+    # Asegurar columnas necesarias
+    columnas_necesarias = ["Search Terms", "Search Volume", "tier"]
+    for col in columnas_necesarias:
+        if col not in df.columns:
+            st.error(
+                f"Falta la columna obligatoria '{col}' en la matriz de tiers.")
+            return pd.DataFrame()
+
     df["tokens"] = df["Search Terms"].apply(
         lambda x: limpiar_texto(x, stopwords))
     return df
