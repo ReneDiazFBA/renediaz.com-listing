@@ -50,12 +50,16 @@ def tokenizar_keywords() -> pd.DataFrame:
     df = df.copy()
 
     # Asegurar columnas necesarias
-    columnas_necesarias = ["Search Terms", "Search Volume", "tier"]
+    columnas_necesarias = ["Search Terms",
+                           "Search Volume", "Clasificación Estrategia"]
     for col in columnas_necesarias:
         if col not in df.columns:
             st.error(
                 f"Falta la columna obligatoria '{col}' en la matriz de tiers.")
             return pd.DataFrame()
+
+    # Estandarizar columna para que el resto del módulo use siempre "tier"
+    df["tier"] = df["Clasificación Estrategia"]
 
     df["tokens"] = df["Search Terms"].apply(
         lambda x: limpiar_texto(x, stopwords))
