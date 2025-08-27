@@ -5,7 +5,7 @@ from streamlit_option_menu import option_menu
 
 st.set_page_config(page_title="ReneDiaz.com Listing", layout="wide")
 
-# 1. Menú lateral — sin íconos, sin submenús rotos
+# 1. Menú lateral
 with st.sidebar:
     st.markdown("## Navegación")
 
@@ -35,7 +35,7 @@ with st.sidebar:
         }
     )
 
-# 2. Navegación lógica — hijo simulado
+# 2. Navegación lógica
 if seccion_principal == "Datos":
     from datos.app_datos_upload import mostrar_carga_excel
     mostrar_carga_excel()
@@ -58,5 +58,5 @@ elif seccion_principal == "Mercado":
     mostrar_analisis_mercado(st.session_state.excel_data)
 
 elif seccion_principal == "Listing":
-    st.title("Módulo: Listing")
-    st.info("Aquí se construirá el listing final. [Placeholder]")
+    from listing.app_listing_datos import mostrar_listing
+    mostrar_listing(st.session_state.excel_data)
