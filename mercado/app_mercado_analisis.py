@@ -167,7 +167,13 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                 st.warning("No se encontraron atributos relevantes en CustData.")
             else:
                 st.caption("Puedes editar directamente esta tabla. Las columnas vacías o filas vacías serán ignoradas.")
-                edited = st.data_editor(df_edit, num_rows="dynamic", use_container_width=True)
+                edited = st.data_editor(
+                    df_edit,
+                    use_container_width=True,
+                    num_rows="dynamic",
+                    hide_index=True,
+                    key="tabla_editable_contraste"
+                )
 
     elif subvista == "insights":
         st.info("Vista: Insights de reviews (IA)")
