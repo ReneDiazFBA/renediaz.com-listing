@@ -4,6 +4,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from typing import Optional
+from mercado.loader_inputs_listing import construir_inputs_listing
 from utils.nav_utils import render_subnav
 
 
@@ -109,6 +110,12 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                     hide_index=True,
                     key="tabla_editable_contraste"
                 )
+            from mercado.loader_inputs_listing import construir_inputs_listing
+
+            st.session_state["inputs_para_listing"] = construir_inputs_listing(
+                st.session_state.get("resultados_mercado", {}),
+                edited
+            )
 
     elif subvista == "editorial":
         st.subheader("Léxico Editorial extraído de los reviews")
