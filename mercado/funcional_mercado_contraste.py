@@ -15,7 +15,7 @@ def comparar_atributos_mercado_cliente(excel_data: pd.ExcelFile, atributos_ia: l
         st.error(f"Error al leer atributos del cliente desde CustData: {e}")
         return pd.DataFrame()
 
-    # Ignorar filas vacías
+    # Ignorar filas completamente vacías
     df = df.dropna(how="all")
 
     if df.shape[1] < 3:
@@ -27,22 +27,25 @@ def comparar_atributos_mercado_cliente(excel_data: pd.ExcelFile, atributos_ia: l
         [f"Valor_{i}" for i in range(1, col_total - 3 + 1)]
     df.columns = columnas
 
-    # Filtrar por Relevante = "si"
+    # Filtrar donde Relevante = "si"
     df = df[df["Relevante"].astype(str).str.lower() == "si"]
     df["Atributo"] = df["Atributo"].astype(str).str.strip()
 
-    # Construcción del DataFrame editable
-    editable_rows = max(len(atributos_ia), len(df))
+    # Extraer los atributos y valores del cliente
+    atributos_cliente = df["Atributo"].tolist()
+    valores_cliente = df[[c for c in df.columns if c.startswith("Valor_")]].copy()
+    valores_cliente.columns = [c.replace("Valor_", "Valor ") for c in valores_cliente.columns]
+
+    # Igualar número de filas (máximo entre IA y cliente)
+    total_filas = max(len(atributos_ia), len(atributos_cliente))
 
     data = {
-        "Atributo IA": atributos_ia + [""] * (editable_rows - len(atributos_ia)),
-        "Atributo Cliente": df["Atributo"].tolist() + [""] * (editable_rows - len(df)),
+        "Atributo IA": atributos_ia + [""] * (total_filas - len(atributos_ia)),
+        "Atributo Cliente": atributos_cliente + [""] * (total_filas - len(atributos_cliente))
     }
 
-    # Agregar columnas de valores del cliente (Valor_1, Valor_2, ...)
-    for col in [c for c in df.columns if c.startswith("Valor_")]:
-        data[col.replace("Valor_", "Valor ")] = df[col].tolist() + \
-            [""] * (editable_rows - len(df))
+    for col in valores_cliente.columns:
+        data[col] = valores_cliente[col].tolist() + [""] * (total_filas - len(valores_cliente))
 
     df_editable = pd.DataFrame(data)
     return df_editable
