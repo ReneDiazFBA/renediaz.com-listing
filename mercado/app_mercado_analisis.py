@@ -135,17 +135,16 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                 st.info("No se encontró contenido de recomendaciones visuales.")
 
     elif subvista == "tabla":
-        st.subheader("Tabla Final de Inputs para Listing")
+        st.subheader("Tabla final de inputs para el Listing")
 
         try:
             from mercado.loader_inputs_listing import cargar_inputs_para_listing
             df_final = cargar_inputs_para_listing()
 
             if df_final.empty:
-                st.warning(
-                    "La tabla de inputs está vacía. Asegúrate de haber generado los insights y la tabla de contraste.")
+                st.info(
+                    "Aún no se ha generado la tabla. Corre primero los análisis previos.")
             else:
                 st.dataframe(df_final, use_container_width=True)
-
         except Exception as e:
             st.error(f"Error al cargar tabla final de inputs: {e}")
