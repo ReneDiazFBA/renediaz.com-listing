@@ -136,3 +136,7 @@ def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.Data
 
     df = pd.DataFrame(data)
     return df
+
+
+def cargar_inputs_para_listing() -> dict:
+    return st.session_state.get("inputs_para_listing", {})
