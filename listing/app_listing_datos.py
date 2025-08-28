@@ -11,8 +11,6 @@ from listing.app_listing_tokenizacion import (
     mostrar_embeddings_visualizacion,
 )
 
-from listing.app_listing_semantico import mostrar_listing_semantico
-
 
 def mostrar_listing(excel_data: Optional[object] = None):
     st.title("ReneDiaz.com Dashboard — Listing")
@@ -20,9 +18,11 @@ def mostrar_listing(excel_data: Optional[object] = None):
 
     subvista = st.radio(
         "Secciones disponibles:",
-        options=["tokenizacion", "copywrite", "imagenes", "brandstory", "aplus"],
+        options=["tokenizacion", "semantico", "copywrite",
+                 "imagenes", "brandstory", "aplus"],
         format_func=lambda x: {
             "tokenizacion": "Tokenización",
+            "semantico": "SEO Semántico",
             "copywrite": "Copywriting",
             "imagenes": "Imágenes",
             "brandstory": "Brand Story",
@@ -31,7 +31,6 @@ def mostrar_listing(excel_data: Optional[object] = None):
         horizontal=True,
         key="nav_listing"
     )
-
 
     st.divider()
 
@@ -49,6 +48,10 @@ def mostrar_listing(excel_data: Optional[object] = None):
     elif subvista == "copywrite":
         from listing.app_listing_copywrite import mostrar_listing_copywrite
         mostrar_listing_copywrite(excel_data)
+
+    elif subvista == "semantico":
+        from listing.app_listing_semantico import mostrar_listing_semantico
+        mostrar_listing_semantico(excel_data)
 
     elif subvista == "imagenes":
         from listing.app_listing_imagenes import mostrar_listing_imagenes
