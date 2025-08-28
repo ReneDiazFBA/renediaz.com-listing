@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-from listings.semantic.loader_semantic_data import cargar_lemas_clusters
+from listing.semantic.loader_semantic_data import cargar_lemas_clusters
 
 
 def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.DataFrame:
