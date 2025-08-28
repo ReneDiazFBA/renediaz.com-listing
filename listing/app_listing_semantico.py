@@ -10,6 +10,8 @@ from listing.app_listing_tokenizacion import (
     mostrar_clusters_semanticos
 )
 
+from mercado.loader_inputs_listing import construir_inputs_listing
+
 
 def mostrar_listing_semantico(excel_data: Optional[object] = None):
     """
@@ -42,9 +44,15 @@ def mostrar_listing_semantico(excel_data: Optional[object] = None):
         mostrar_clusters_semanticos(excel_data)
 
     elif subvista == "preview":
-        st.markdown("#### Inputs enriquecidos para generación de listing")
-        df_final = cargar_inputs_listing_enriquecido()
+        st.markdown("### Inputs enriquecidos para generación de listing")
+
+        from mercado.loader_inputs_listing import construir_inputs_listing
+        resultados = st.session_state.get("resultados_mercado", {})
+        df_edit = st.session_state.get("df_edit_atributos", pd.DataFrame())
+
+        df_final = construir_inputs_listing(resultados, df_edit)
+
         if df_final.empty:
-            st.warning("No se pudo generar la tabla final de inputs.")
+            st.warning("No se pudo construir la tabla final.")
         else:
             st.dataframe(df_final, use_container_width=True)
