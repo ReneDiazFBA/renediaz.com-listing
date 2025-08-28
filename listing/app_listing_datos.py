@@ -37,6 +37,9 @@ def mostrar_listing(excel_data: Optional[object] = None):
         mostrar_tokens_priorizados(excel_data)
         st.divider()
         mostrar_tokens_lematizados(excel_data)
+        st.divider()
+        from listing.app_listing_tokenizacion import mostrar_embeddings_visualizacion
+        mostrar_embeddings_visualizacion(excel_data)
 
     elif subvista == "copywrite":
         from listing.app_listing_copywrite import mostrar_listing_copywrite
