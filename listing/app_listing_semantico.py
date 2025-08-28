@@ -1,6 +1,7 @@
 # listing/app_listing_semantico.py
 
 import streamlit as st
+import pandas as pd
 from typing import Optional
 from utils.nav_utils import render_subnav
 
