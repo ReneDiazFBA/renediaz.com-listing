@@ -20,8 +20,7 @@ def mostrar_listing(excel_data: Optional[object] = None):
 
     subvista = st.radio(
         "Secciones disponibles:",
-        options=["tokenizacion", "copywrite",
-                 "imagenes", "brandstory", "aplus"],
+        options=["tokenizacion", "copywrite", "imagenes", "brandstory", "aplus"],
         format_func=lambda x: {
             "tokenizacion": "Tokenización",
             "copywrite": "Copywriting",
@@ -32,6 +31,7 @@ def mostrar_listing(excel_data: Optional[object] = None):
         horizontal=True,
         key="nav_listing"
     )
+
 
     st.divider()
 
