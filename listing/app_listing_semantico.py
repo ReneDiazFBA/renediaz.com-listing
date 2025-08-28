@@ -10,10 +10,12 @@ from listing.app_listing_tokenizacion import (
     mostrar_clusters_semanticos
 )
 
+from listing.loader_listing_mercado import cargar_inputs_listing_enriquecido
+
 
 def mostrar_listing_semantico(excel_data: Optional[object] = None):
     """
-    Contenedor principal para la vista de SEO semántico (lemmatización, embeddings, clusters).
+    Contenedor principal para la vista de SEO semántico (lemmatización, embeddings, clusters, inputs enriquecidos).
     """
     st.caption(
         "Explora y estructura tokens estratégicos con agrupación semántica para listings optimizados.")
@@ -21,7 +23,8 @@ def mostrar_listing_semantico(excel_data: Optional[object] = None):
     secciones = {
         "lemmas": ("Lematización", "lemmas"),
         "embedding": ("Embeddings y PCA", "embedding"),
-        "clusters": ("Clusters semánticos", "clusters")
+        "clusters": ("Clusters semánticos", "clusters"),
+        "preview": ("Vista previa para listing", "preview")
     }
 
     subvista = render_subnav(default_key="lemmas", secciones=secciones)
@@ -39,3 +42,11 @@ def mostrar_listing_semantico(excel_data: Optional[object] = None):
 
     elif subvista == "clusters":
         mostrar_clusters_semanticos(excel_data)
+
+    elif subvista == "preview":
+        st.markdown("#### Inputs enriquecidos para generación de listing")
+        df_final = cargar_inputs_listing_enriquecido()
+        if df_final.empty:
+            st.warning("No se pudo generar la tabla final de inputs.")
+        else:
+            st.dataframe(df_final, use_container_width=True)
