@@ -5,6 +5,13 @@ import pandas as pd
 import spacy
 import re
 
+try:
+    nlp_embed = spacy.load("en_core_web_md")
+    _EMBEDD_OK = True
+except Exception as e:
+    _EMBEDD_OK = False
+    _EMBEDD_ERR = str(e)
+
 from listing.loader_listing_keywords import get_tiers_table
 
 
@@ -276,3 +283,22 @@ def lemmatizar_tokens_priorizados(df_tokens: pd.DataFrame) -> pd.DataFrame:
 
     # Orden final
     return df_grouped[["token_original", "token_lema", "frecuencia", "tier_origen"]]
+
+
+def generar_embeddings(df_lemas: pd.DataFrame) -> pd.DataFrame:
+    """
+    Genera vectores embeddings para cada token_lema usando spaCy (en_core_web_md).
+    Agrega columna 'vector' con numpy arrays.
+    """
+    if not _EMBEDD_OK:
+        st.error(f"No se pudo cargar el modelo de embeddings: {_EMBEDD_ERR}")
+        return pd.DataFrame()
+
+    df = df_lemas.copy()
+    vectores = []
+    for lema in df["token_lema"]:
+        doc = nlp_embed(lema)
+        vectores.append(doc.vector)
+
+    df["vector"] = vectores
+    return df
