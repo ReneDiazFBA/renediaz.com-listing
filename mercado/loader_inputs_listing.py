@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 
+from listings.semantic.loader_semantic_data import cargar_lemas_clusters
+
 
 def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.DataFrame:
     data = []
@@ -121,6 +123,7 @@ def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.Data
                             })
 
     df = pd.DataFrame(data)
+    df = agregar_semantico_a_inputs(df)  # <- integración aquí
     return df.dropna(how="all")
 
 
@@ -133,3 +136,19 @@ def cargar_inputs_para_listing() -> pd.DataFrame:
         return df
     else:
         return pd.DataFrame()
+
+
+def agregar_semantico_a_inputs(df: pd.DataFrame) -> pd.DataFrame:
+    df_sem = cargar_lemas_clusters()
+    if df_sem.empty:
+        return df
+
+    for _, row in df_sem.iterrows():
+        df = pd.concat([df, pd.DataFrame([{
+            "Tipo": "Token Semántico",
+            "Contenido": row["token_lema"],
+            "Etiqueta": f"Cluster {row['cluster']}",
+            "Fuente": "Clustering"
+        }])], ignore_index=True)
+
+    return df
