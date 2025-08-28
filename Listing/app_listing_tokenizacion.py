@@ -132,6 +132,7 @@ def mostrar_tokens_lematizados(excel_data=None):
     st.dataframe(df_lemas[["token_original", "token_lema", "frecuencia", "tier_origen"]],
                  use_container_width=True)
 
+    st.session_state["listing_tokens"] = df_lemas
 
 def mostrar_embeddings_visualizacion(excel_data=None):
     st.subheader("Embeddings y Visualización Semántica")
@@ -282,3 +283,5 @@ def mostrar_clusters_semanticos(excel_data=None):
     ax.set_ylabel("PCA 2")
     ax.legend()
     st.pyplot(fig)
+
+    st.session_state["listing_clusters"] = df_cluster
