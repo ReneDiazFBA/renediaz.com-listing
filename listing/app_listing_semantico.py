@@ -10,8 +10,6 @@ from listing.app_listing_tokenizacion import (
     mostrar_clusters_semanticos
 )
 
-from listing.loader_listing_mercado import cargar_inputs_listing_enriquecido
-
 
 def mostrar_listing_semantico(excel_data: Optional[object] = None):
     """
