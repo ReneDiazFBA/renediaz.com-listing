@@ -8,13 +8,15 @@ from listing.app_listing_tokenizacion import (
     mostrar_tokens_priorizados,
     mostrar_tokens_lematizados,
     mostrar_clusters_semanticos,
-    mostrar_embeddings_visualizacion
+    mostrar_embeddings_visualizacion,
 )
+
+from listing.app_listing_semantico import mostrar_listing_semantico
 
 
 def mostrar_listing(excel_data: Optional[object] = None):
     st.title("ReneDiaz.com Dashboard — Listing")
-    st.caption("Tokenización, copywriting, visuales, Brand Story y A+.")
+    st.caption("Tokenización, semántico, copywriting, visuales, Brand Story y A+.")
 
     subvista = st.radio(
         "Secciones disponibles:",
