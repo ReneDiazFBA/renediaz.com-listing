@@ -1,14 +1,16 @@
 # listing/app_listing_tokenizacion.py
 
 import streamlit as st
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.decomposition import PCA
+
 from listing.funcional_listing_tokenizacion import (
     tokenizar_keywords,
     priorizar_tokens,
     lemmatizar_tokens_priorizados,
-    generar_embeddings
+    generar_embeddings,
+    agrupar_embeddings_kmeans
 )
 
 
@@ -193,5 +195,89 @@ def mostrar_embeddings_visualizacion(excel_data=None):
     ax.set_title("Tokens Lematizados Embebidos — Proyección PCA")
     ax.set_xlabel("Componente 1")
     ax.set_ylabel("Componente 2")
+    ax.legend()
+    st.pyplot(fig)
+
+
+def plot_pca_embeddings(df: pd.DataFrame, color_by: str = "tier_origen"):
+    """
+    Visualiza los embeddings proyectados a 2D usando PCA.
+    Puede colorear por 'tier_origen' o por 'cluster'.
+    """
+    if "vector" not in df.columns:
+        st.warning("No se encuentran los vectores de embedding.")
+        return
+
+    # Reducción de dimensionalidad
+    X = np.stack(df["vector"].values)
+    pca = PCA(n_components=2)
+    X_pca = pca.fit_transform(X)
+
+    df_plot = df.copy()
+    df_plot["pca_1"] = X_pca[:, 0]
+    df_plot["pca_2"] = X_pca[:, 1]
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(8, 6))
+    for grupo in df_plot[color_by].unique():
+        subgrupo = df_plot[df_plot[color_by] == grupo]
+        ax.scatter(subgrupo["pca_1"], subgrupo["pca_2"],
+                   label=str(grupo), alpha=0.6)
+        for _, row in subgrupo.iterrows():
+            ax.text(row["pca_1"], row["pca_2"],
+                    row["token_lema"], fontsize=7, alpha=0.6)
+
+    ax.set_title("Tokens Lematizados Embebidos — Proyección PCA")
+    ax.set_xlabel("Componente 1")
+    ax.set_ylabel("Componente 2")
+    ax.legend()
+    st.pyplot(fig)
+
+
+def mostrar_clusters_semanticos(excel_data=None):
+    st.subheader("Clusterización Semántica de Tokens")
+
+    n_clusters = st.slider(
+        "Número de clusters K para agrupación semántica",
+        min_value=2,
+        max_value=15,
+        value=6,
+        step=1
+    )
+
+    # Reusar pipeline completo
+    df_tokens = priorizar_tokens(["Top 25%", "Top 50%"], ["Top 25%"], [])
+    if df_tokens.empty:
+        st.warning("No hay tokens priorizados.")
+        return
+
+    df_lemas = lemmatizar_tokens_priorizados(df_tokens)
+    df_embed = generar_embeddings(df_lemas)
+
+    df_cluster = agrupar_embeddings_kmeans(df_embed, n_clusters=n_clusters)
+    if df_cluster.empty:
+        st.warning("No se pudo clusterizar.")
+        return
+
+    # Visualizar clusters en 2D
+    fig, ax = plt.subplots(figsize=(10, 6))
+    cmap = plt.get_cmap("tab10")
+
+    for cluster_id in sorted(df_cluster["cluster"].unique()):
+        datos = df_cluster[df_cluster["cluster"] == cluster_id]
+        ax.scatter(
+            datos["x"], datos["y"],
+            label=f"Cluster {cluster_id}",
+            s=60,
+            alpha=0.7,
+            color=cmap(cluster_id % 10)
+        )
+        for _, row in datos.iterrows():
+            ax.text(row["x"] + 0.01, row["y"] + 0.01,
+                    row["token_lema"], fontsize=8, alpha=0.5)
+
+    ax.set_title("Clusters Semánticos de Tokens")
+    ax.set_xlabel("PCA 1")
+    ax.set_ylabel("PCA 2")
     ax.legend()
     st.pyplot(fig)

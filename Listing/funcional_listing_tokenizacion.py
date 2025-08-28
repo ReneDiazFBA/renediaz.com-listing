@@ -3,6 +3,7 @@
 import streamlit as st
 import pandas as pd
 import spacy
+from sklearn.cluster import KMeans
 import re
 
 try:
@@ -302,3 +303,28 @@ def generar_embeddings(df_lemas: pd.DataFrame) -> pd.DataFrame:
 
     df["vector"] = vectores
     return df
+
+
+def agrupar_embeddings_kmeans(df_embeddings: pd.DataFrame, n_clusters: int = 8) -> pd.DataFrame:
+    """
+    Aplica KMeans sobre los vectores para asignar clústeres semánticos.
+    Agrega columna 'cluster' y columnas PCA (x, y) para visualización.
+    """
+    if df_embeddings.empty or "vector" not in df_embeddings.columns:
+        st.error("No se encontraron vectores para clusterizar.")
+        return pd.DataFrame()
+
+    X = np.stack(df_embeddings["vector"].values)
+
+    # Clusterización
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init="auto")
+    clusters = kmeans.fit_predict(X)
+    df_embeddings["cluster"] = clusters
+
+    # Reducción PCA a 2D
+    pca = PCA(n_components=2)
+    X_pca = pca.fit_transform(X)
+    df_embeddings["x"] = X_pca[:, 0]
+    df_embeddings["y"] = X_pca[:, 1]
+
+    return df_embeddings

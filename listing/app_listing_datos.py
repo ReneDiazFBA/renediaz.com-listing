@@ -6,7 +6,9 @@ from typing import Optional
 from listing.app_listing_tokenizacion import (
     mostrar_listing_tokenizacion,
     mostrar_tokens_priorizados,
-    mostrar_tokens_lematizados
+    mostrar_tokens_lematizados,
+    mostrar_clusters_semanticos,
+    mostrar_embeddings_visualizacion
 )
 
 
@@ -38,8 +40,9 @@ def mostrar_listing(excel_data: Optional[object] = None):
         st.divider()
         mostrar_tokens_lematizados(excel_data)
         st.divider()
-        from listing.app_listing_tokenizacion import mostrar_embeddings_visualizacion
         mostrar_embeddings_visualizacion(excel_data)
+        st.divider()
+        mostrar_clusters_semanticos(excel_data)
 
     elif subvista == "copywrite":
         from listing.app_listing_copywrite import mostrar_listing_copywrite
