@@ -138,13 +138,8 @@ def cargar_inputs_para_listing() -> pd.DataFrame:
         return pd.DataFrame()
 
 
-# >>> RD_FIX: helper robusto para obtener los clusters semánticos si el loader original no trae datos
+# >>> RD_FIX: helper robusto para tomar clusters desde session_state si el loader original no trae datos
 def _cargar_lemas_clusters_robusto() -> pd.DataFrame:
-    """
-    Fallback: intenta obtener los lemas/cluster desde session_state
-    priorizando el alias del bridge y luego la clave nativa.
-    No reemplaza nada existente; solo actúa si cargar_lemas_clusters() falla.
-    """
     # Prioridad 1: alias expuesto por el bridge en Listing
     df = st.session_state.get("df_lemas_cluster")
     if isinstance(df, pd.DataFrame) and not df.empty:
@@ -162,36 +157,29 @@ def _cargar_lemas_clusters_robusto() -> pd.DataFrame:
 def agregar_semantico_a_inputs(df: pd.DataFrame) -> pd.DataFrame:
     df_sem = cargar_lemas_clusters()
     if df_sem.empty:
-        # >>> RD_FIX: fallback no intrusivo si el loader original no trae nada
+        # >>> RD_FIX: fallback si el loader original no devolvió nada
         df_sem = _cargar_lemas_clusters_robusto()
         # <<< RD_FIX
         if df_sem.empty:
             return df
 
-    # >>> RD_FIX: normalización defensiva sin romper columnas existentes
-    # Asegura que existan las columnas esperadas para el mapeo
+    # >>> RD_FIX: normalización defensiva
     if "token_lema" not in df_sem.columns:
-        # intenta usar 'token' si existiera
         posibles = [c for c in df_sem.columns if c.lower() == "token"]
+        df_sem = df_sem.copy()
         if posibles:
-            df_sem = df_sem.copy()
             df_sem["token_lema"] = df_sem[posibles[0]].astype(str)
         else:
-            # último recurso: usa la primera columna como contenido
-            df_sem = df_sem.copy()
             df_sem["token_lema"] = df_sem.iloc[:, 0].astype(str)
 
     if "cluster" not in df_sem.columns:
-        # intenta 'Cluster' si existiera
+        df_sem = df_sem.copy()
         if "Cluster" in df_sem.columns:
-            df_sem = df_sem.copy()
             df_sem["cluster"] = df_sem["Cluster"]
         else:
-            df_sem = df_sem.copy()
             df_sem["cluster"] = "?"
     # <<< RD_FIX
 
-    # Mantengo tu lógica original de concatenación, pero en bloque para eficiencia
     bloque = pd.DataFrame({
         "Tipo": "Token Semántico",
         "Contenido": df_sem["token_lema"].astype(str),
