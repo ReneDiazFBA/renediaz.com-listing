@@ -7,11 +7,16 @@ from typing import Optional
 from mercado.loader_inputs_listing import construir_inputs_listing
 from utils.nav_utils import render_subnav
 
+# >>> RD_FIX: bandera para desactivar el simulador
+USAR_SIMULADOR_IA = False
+# <<< RD_FIX
+
 
 def mostrar_analisis_mercado(excel_data: Optional[object] = None):
     st.markdown("### Análisis del Mercado")
     st.caption(
-        "Insights, emociones, atributos valorados, estilo editorial y visual extraídos desde los reviews.")
+        "Insights, emociones, atributos valorados, estilo editorial y visual extraídos desde los reviews."
+    )
 
     secciones = {
         "insights": ("Insights de Reviews", None),
@@ -35,55 +40,69 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
             from mercado.funcional_mercado_reviews import analizar_reviews
 
             datos = cargar_data_cliente(excel_data)
-        if st.button("Simular insights sin IA"):
-            resultados = {
-                "nombre_producto": "Privacy Folders para Estudiantes – Paneles de Escritorio",
-                "descripcion": "Separadores plegables de cartón para mejorar la concentración y privacidad durante pruebas o tareas escolares.",
-                "beneficios": "- Reduce distracciones en el aula\n- Ideal para exámenes\n- Ligero y fácil de almacenar\n- Fomenta la concentración\n- Económico y reutilizable",
-                "buyer_persona": "Profesores de primaria que buscan herramientas económicas para mejorar el enfoque de sus estudiantes durante actividades evaluativas.",
-                "pros_cons": "PROS:\n- Fácil de usar\n- Mejora la concentración\n- Buena relación calidad/precio\nCONS:\n- Puede doblarse con el uso\n- No resiste humedad",
-                "emociones": "- Enfoque\n- Orden\n- Tranquilidad\n- Autoridad\n- Control",
-                "atributos_valorados": "- Material\n- Tamaño\n- Plegable\n- Color neutro\n- Reutilizable",
-                "tokens_diferenciadores": "",  # Eliminado del flujo pero necesario para evitar error
-                "lexico_editorial": "Quiet learning • Focused environment • Classroom control • Reusable cardboard panels • Budget-friendly solution",
-                "visuales": "Mostrar a varios estudiantes sentados en escritorios individuales con los privacy folders abiertos durante una prueba, ambiente ordenado y silencioso."
-            }
 
-            st.session_state["resultados_mercado"] = resultados
-            st.success("Simulación cargada con éxito.")
+            # >>> RD_FIX: Botón IA real (no rompe nada si no se usa)
+            if st.button("Generar insights con IA"):
+                # Toma segura de API key desde secrets si está disponible
+                # (no falla si ya está en el entorno)
+                try:
+                    import os
+                    if "OPENAI_API_KEY" in st.secrets and st.secrets["OPENAI_API_KEY"]:
+                        os.environ.setdefault(
+                            "OPENAI_API_KEY", st.secrets["OPENAI_API_KEY"])
+                except Exception:
+                    pass
 
+                st.info("Analizando reviews con IA...")
+                try:
+                    resultados = analizar_reviews(
+                        excel_data, datos.get("preguntas_rufus", []))
+                    st.session_state["resultados_mercado"] = resultados
+                    st.success("Análisis completado.")
+                except Exception as e:
+                    st.error(f"Error al analizar con IA: {e}")
 
-            #if st.button("Generate AI insights"):
-                #st.info("Analizando reviews con IA...")
-                #resultados = analizar_reviews(
-                #excel_data, datos.get("preguntas_rufus", []))
-                #st.session_state["resultados_mercado"] = resultados
-                #st.success("Análisis completado.")
-            #else:
-                #resultados = st.session_state.get("resultados_mercado", {})
+            # <<< RD_FIX
+
+            # Simulador (desactivado por bandera)
+            if USAR_SIMULADOR_IA and st.button("Simular insights sin IA"):
+                resultados = {
+                    "nombre_producto": "Privacy Folders para Estudiantes – Paneles de Escritorio",
+                    "descripcion": "Separadores plegables de cartón para mejorar la concentración y privacidad durante pruebas o tareas escolares.",
+                    "beneficios": "- Reduce distracciones en el aula\n- Ideal para exámenes\n- Ligero y fácil de almacenar\n- Fomenta la concentración\n- Económico y reutilizable",
+                    "buyer_persona": "Profesores de primaria que buscan herramientas económicas para mejorar el enfoque de sus estudiantes durante actividades evaluativas.",
+                    "pros_cons": "PROS:\n- Fácil de usar\n- Mejora la concentración\n- Buena relación calidad/precio\nCONS:\n- Puede doblarse con el uso\n- No resiste humedad",
+                    "emociones": "- Enfoque\n- Orden\n- Tranquilidad\n- Autoridad\n- Control",
+                    "atributos_valorados": "- Material\n- Tamaño\n- Plegable\n- Color neutro\n- Reutilizable",
+                    "tokens_diferenciadores": "",
+                    "lexico_editorial": "Quiet learning • Focused environment • Classroom control • Reusable cardboard panels • Budget-friendly solution",
+                    "visuales": "Mostrar a varios estudiantes sentados en escritorios individuales con los privacy folders abiertos durante una prueba, ambiente ordenado y silencioso."
+                }
+                st.session_state["resultados_mercado"] = resultados
+                st.success("Simulación cargada con éxito.")
 
             resultados = st.session_state.get("resultados_mercado", {})
             if resultados:
                 st.markdown(
-                    f"**Nombre del producto:** {resultados['nombre_producto']}")
+                    f"**Nombre del producto:** {resultados.get('nombre_producto','')}")
                 st.markdown(
-                    f"**Descripción breve:** {resultados['descripcion']}")
+                    f"**Descripción breve:** {resultados.get('descripcion','')}")
                 st.markdown("**Beneficios valorados:**")
-                st.markdown(resultados["beneficios"])
+                st.markdown(resultados.get("beneficios", ""))
                 st.markdown("**Buyer persona:**")
-                st.markdown(resultados["buyer_persona"])
+                st.markdown(resultados.get("buyer_persona", ""))
                 st.markdown("**Pros / Cons:**")
-                st.markdown(resultados["pros_cons"])
+                st.markdown(resultados.get("pros_cons", ""))
                 st.markdown("**Emociones detectadas:**")
-                st.markdown(resultados["emociones"])
+                st.markdown(resultados.get("emociones", ""))
                 st.markdown("**Tokens diferenciadores:**")
-                st.markdown(resultados["tokens_diferenciadores"])
+                st.markdown(resultados.get("tokens_diferenciadores", ""))
 
                 if "validacion_rufus" in resultados:
                     st.markdown("**Validación preguntas Rufus:**")
                     st.markdown(resultados["validacion_rufus"])
             else:
-                st.info("Haz clic en el botón para generar los insights.")
+                st.info("Genera los insights con IA para continuar.")
 
     elif subvista == "cliente":
         st.subheader("Contraste con Atributos del Cliente")
@@ -120,7 +139,8 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                     "No se encontraron atributos relevantes en CustData.")
             else:
                 st.caption(
-                    "Puedes editar directamente esta tabla. Las columnas vacías o filas vacías serán ignoradas.")
+                    "Puedes editar directamente esta tabla. Las columnas vacías o filas vacías serán ignoradas."
+                )
                 edited = st.data_editor(
                     df_edit,
                     use_container_width=True,
@@ -128,6 +148,7 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                     hide_index=True,
                     key="tabla_editable_contraste"
                 )
+
             from mercado.loader_inputs_listing import construir_inputs_listing
 
             st.session_state["inputs_para_listing"] = construir_inputs_listing(
@@ -170,10 +191,30 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
             from mercado.loader_inputs_listing import cargar_inputs_para_listing
             df_final = cargar_inputs_para_listing()
 
+            # >>> RD_FIX: Botón opcional para reconstruir inputs (no rompe flujo actual)
+            if st.button("Reconstruir inputs"):
+                df_edit = st.session_state.get("df_edit", pd.DataFrame())
+                resultados = st.session_state.get("resultados_mercado", {})
+                try:
+                    df_final = construir_inputs_listing(resultados, df_edit)
+                    st.session_state["inputs_para_listing"] = df_final
+                    st.success("Inputs reconstruidos.")
+                except Exception as e:
+                    st.error(f"Error al reconstruir inputs: {e}")
+            # <<< RD_FIX
+
             if df_final.empty:
                 st.info(
                     "Aún no se ha generado la tabla. Corre primero los análisis previos.")
             else:
+                # >>> RD_FIX: Diagnóstico ligero (informativo)
+                lc = len(st.session_state.get(
+                    "listing_clusters", pd.DataFrame()))
+                dlc = len(st.session_state.get(
+                    "df_lemas_cluster", pd.DataFrame()))
+                st.caption(
+                    f"Tokens (listing_clusters): {lc} | Tokens (df_lemas_cluster): {dlc}")
+                # <<< RD_FIX
                 st.dataframe(df_final, use_container_width=True)
         except Exception as e:
             st.error(f"Error al cargar tabla final de inputs: {e}")
