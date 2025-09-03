@@ -138,17 +138,65 @@ def cargar_inputs_para_listing() -> pd.DataFrame:
         return pd.DataFrame()
 
 
+# >>> RD_FIX: helper robusto para obtener los clusters semánticos si el loader original no trae datos
+def _cargar_lemas_clusters_robusto() -> pd.DataFrame:
+    """
+    Fallback: intenta obtener los lemas/cluster desde session_state
+    priorizando el alias del bridge y luego la clave nativa.
+    No reemplaza nada existente; solo actúa si cargar_lemas_clusters() falla.
+    """
+    # Prioridad 1: alias expuesto por el bridge en Listing
+    df = st.session_state.get("df_lemas_cluster")
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        return df
+
+    # Prioridad 2: artefacto nativo del módulo de Listing
+    df = st.session_state.get("listing_clusters")
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        return df
+
+    return pd.DataFrame()
+# <<< RD_FIX
+
+
 def agregar_semantico_a_inputs(df: pd.DataFrame) -> pd.DataFrame:
     df_sem = cargar_lemas_clusters()
     if df_sem.empty:
-        return df
+        # >>> RD_FIX: fallback no intrusivo si el loader original no trae nada
+        df_sem = _cargar_lemas_clusters_robusto()
+        # <<< RD_FIX
+        if df_sem.empty:
+            return df
 
-    for _, row in df_sem.iterrows():
-        df = pd.concat([df, pd.DataFrame([{
-            "Tipo": "Token Semántico",
-            "Contenido": row["token_lema"],
-            "Etiqueta": f"Cluster {row['cluster']}",
-            "Fuente": "Clustering"
-        }])], ignore_index=True)
+    # >>> RD_FIX: normalización defensiva sin romper columnas existentes
+    # Asegura que existan las columnas esperadas para el mapeo
+    if "token_lema" not in df_sem.columns:
+        # intenta usar 'token' si existiera
+        posibles = [c for c in df_sem.columns if c.lower() == "token"]
+        if posibles:
+            df_sem = df_sem.copy()
+            df_sem["token_lema"] = df_sem[posibles[0]].astype(str)
+        else:
+            # último recurso: usa la primera columna como contenido
+            df_sem = df_sem.copy()
+            df_sem["token_lema"] = df_sem.iloc[:, 0].astype(str)
 
-    return df
+    if "cluster" not in df_sem.columns:
+        # intenta 'Cluster' si existiera
+        if "Cluster" in df_sem.columns:
+            df_sem = df_sem.copy()
+            df_sem["cluster"] = df_sem["Cluster"]
+        else:
+            df_sem = df_sem.copy()
+            df_sem["cluster"] = "?"
+    # <<< RD_FIX
+
+    # Mantengo tu lógica original de concatenación, pero en bloque para eficiencia
+    bloque = pd.DataFrame({
+        "Tipo": "Token Semántico",
+        "Contenido": df_sem["token_lema"].astype(str),
+        "Etiqueta": "Cluster " + df_sem["cluster"].astype(str),
+        "Fuente": "Clustering"
+    }).drop_duplicates()
+
+    return pd.concat([df, bloque], ignore_index=True)
