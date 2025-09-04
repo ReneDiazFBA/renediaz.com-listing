@@ -285,8 +285,8 @@ def mostrar_clusters_semanticos(excel_data=None):
     ax.legend()
     st.pyplot(fig)
 
-
-_df = st.session_state.get("listing_clusters", pd.DataFrame())
-if isinstance(_df, pd.DataFrame) and not _df.empty:
-    # Alias de compatibilidad para mercado/loader_inputs_listing.py
-    st.session_state["df_lemas_cluster"] = _df.copy()
+    # >>> FIX 1: guardar clusters en sesión y exponer alias esperado por Mercado
+    st.session_state["listing_clusters"] = df_cluster
+    _df = st.session_state.get("listing_clusters", pd.DataFrame())
+    if isinstance(_df, pd.DataFrame) and not _df.empty:
+        st.session_state["df_lemas_cluster"] = _df.copy()
