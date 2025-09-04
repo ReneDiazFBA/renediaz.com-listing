@@ -290,3 +290,48 @@ def mostrar_clusters_semanticos(excel_data=None):
     _df = st.session_state.get("listing_clusters", pd.DataFrame())
     if isinstance(_df, pd.DataFrame) and not _df.empty:
         st.session_state["df_lemas_cluster"] = _df.copy()
+
+
+# -------------------------------------------------------------------
+# Vista previa de tabla final de inputs (incluye Marca, Atributos, Variaciones)
+def mostrar_preview_inputs_listing():
+    st.subheader("Vista previa — Inputs para Listing")
+    df = st.session_state.get("inputs_para_listing", pd.DataFrame())
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        st.info("Aún no hay inputs. Genera la tabla desde Mercado → Cliente / Tabla.")
+        return
+
+    # Conteo por Tipo
+    st.caption("Conteo por Tipo")
+    counts = df["Tipo"].value_counts().reset_index()
+    counts.columns = ["Tipo", "Cantidad"]
+    st.dataframe(counts, use_container_width=True)
+
+    # Bloques clave: Marca, Atributo y Variación
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        st.markdown("**Marca**")
+        df_m = df[df["Tipo"].str.lower() == "marca"]
+        if not df_m.empty:
+            st.dataframe(df_m[["Contenido", "Fuente"]], use_container_width=True, hide_index=True)
+        else:
+            st.write("—")
+
+        st.markdown("**Atributos**")
+        df_a = df[df["Tipo"] == "Atributo"]
+        if not df_a.empty:
+            st.dataframe(df_a[["Contenido", "Etiqueta", "Fuente"]], use_container_width=True, hide_index=True)
+        else:
+            st.write("—")
+
+    with col2:
+        st.markdown("**Variaciones**")
+        df_v = df[df["Tipo"] == "Variación"]
+        if not df_v.empty:
+            st.dataframe(df_v[["Contenido", "Etiqueta", "Fuente"]], use_container_width=True, hide_index=True)
+        else:
+            st.write("—")
+
+    # Muestra completa (opcional)
+    with st.expander("Ver tabla completa", expanded=False):
+        st.dataframe(df, use_container_width=True)
