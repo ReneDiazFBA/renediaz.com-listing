@@ -1,5 +1,3 @@
-# listing/app_listing_tokenizacion.py
-
 import streamlit as st
 import numpy as np
 import pandas as pd
@@ -304,7 +302,8 @@ def mostrar_preview_inputs_listing():
             df_edit = st.session_state.get("df_edit", pd.DataFrame())
             excel = st.session_state.get("excel_data", None)
             if resultados and isinstance(df_edit, pd.DataFrame) and not df_edit.empty:
-                df = construir_inputs_listing(resultados, df_edit, excel_data=excel)
+                df = construir_inputs_listing(
+                    resultados, df_edit, excel_data=excel)
                 st.session_state["inputs_para_listing"] = df
         except Exception:
             pass
@@ -325,14 +324,16 @@ def mostrar_preview_inputs_listing():
         st.markdown("**Marca**")
         df_m = df[df["Tipo"].str.lower() == "marca"]
         if not df_m.empty:
-            st.dataframe(df_m[["Contenido", "Fuente"]], use_container_width=True, hide_index=True)
+            st.dataframe(df_m[["Contenido", "Fuente"]],
+                         use_container_width=True, hide_index=True)
         else:
             st.write("—")
 
         st.markdown("**Atributos**")
         df_a = df[df["Tipo"] == "Atributo"]
         if not df_a.empty:
-            st.dataframe(df_a[["Contenido", "Etiqueta", "Fuente"]], use_container_width=True, hide_index=True)
+            st.dataframe(df_a[["Contenido", "Etiqueta", "Fuente"]],
+                         use_container_width=True, hide_index=True)
         else:
             st.write("—")
 
@@ -340,7 +341,8 @@ def mostrar_preview_inputs_listing():
         st.markdown("**Variaciones**")
         df_v = df[df["Tipo"] == "Variación"]
         if not df_v.empty:
-            st.dataframe(df_v[["Contenido", "Etiqueta", "Fuente"]], use_container_width=True, hide_index=True)
+            st.dataframe(df_v[["Contenido", "Etiqueta", "Fuente"]],
+                         use_container_width=True, hide_index=True)
         else:
             st.write("—")
 
