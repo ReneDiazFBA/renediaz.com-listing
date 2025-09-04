@@ -19,14 +19,14 @@ from mercado.prompts_mercado_reviews import (
 )
 
 # ============================================
-# >>> RD_FIX: utilidades ADITIVAS para bajar costo
+# >>> RD_FIX: utilidades ADITIVAS para bajar costo (compatibles 3.9)
 # ============================================
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 import os
 import hashlib
 
 
-def _flag_true(val: str | bool | None) -> bool:
+def _flag_true(val: Union[str, bool, None]) -> bool:
     if isinstance(val, bool):
         return val
     return str(val or "").strip().lower() in {"1", "true", "yes", "y", "on"}
@@ -96,7 +96,7 @@ def _cache_put(cache_key: str, data: dict):
 # ============================================
 
 
-def analizar_reviews(excel_data: pd.ExcelFile, preguntas_rufus: list[str] = []) -> dict:
+def analizar_reviews(excel_data: pd.ExcelFile, preguntas_rufus: List[str] = []) -> dict:
     """
     Ejecuta análisis completo de reviews y devuelve un diccionario estructurado.
     """
