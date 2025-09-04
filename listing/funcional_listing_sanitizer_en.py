@@ -1,6 +1,6 @@
 # listing/funcional_listing_sanitizer_en.py
-# Amazon EN sanitizer: limpia promos/claims, símbolos, competidores; controla bytes y longitudes.
-# Compatible Python 3.9+
+# Amazon EN sanitizer. Enforces RD ranges and cleans content.
+# Python 3.9+
 
 import re
 from typing import List, Dict
@@ -29,16 +29,6 @@ def _strip_html(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def _limit_bytes(text: str, max_bytes: int) -> str:
-    b = (text or "").encode("utf-8")
-    if len(b) <= max_bytes:
-        return text or ""
-    cut = b[:max_bytes]
-    while cut and (cut[-1] & 0xC0) == 0x80:
-        cut = cut[:-1]
-    return cut.decode("utf-8", errors="ignore")
-
-
 def _remove_forbidden(text: str) -> str:
     if not text:
         return ""
@@ -61,15 +51,18 @@ def _sentence_case(s: str) -> str:
     return s[:1].upper() + s[1:]
 
 
-def _words_set(text: str):
-    return set(re.findall(r"[a-z0-9]+", (text or "").lower()))
+def _no_space_bytes_len(s: str) -> int:
+    return len((s or "").replace(" ", "").encode("utf-8"))
 
 
 def sanitize_title_en(title: str) -> str:
     t = _strip_html(title)
     t = _remove_forbidden(t)
     t = _sentence_case(t)
-    return _limit_bytes(t, 200)
+    # RD range: 150–200 chars. Enforced max here (min is goal, not hard).
+    if len(t) > 200:
+        t = t[:200].rstrip()
+    return t
 
 
 def sanitize_bullets_en(bullets: List[str]) -> List[str]:
@@ -79,8 +72,9 @@ def sanitize_bullets_en(bullets: List[str]) -> List[str]:
         bb = _remove_forbidden(bb)
         bb = _sentence_case(bb)
         bb = re.sub(r"\s+", " ", bb).strip()
-        # **Requisito**: < 150 chars
-        bb = bb[:150].rstrip()
+        # RD range: 180–240 chars (enforce max; min is guidance)
+        if len(bb) > 240:
+            bb = bb[:240].rstrip()
         if bb and not re.search(r"[.!?]$", bb):
             bb += "."
         if bb:
@@ -93,18 +87,38 @@ def sanitize_bullets_en(bullets: List[str]) -> List[str]:
 def sanitize_description_en(desc: str) -> str:
     d = _strip_html(desc)
     d = _remove_forbidden(d)
-    d = _limit_bytes(d, 2000)
+    # RD range: 1600–2000 chars (enforce max; min es objetivo)
+    if len(d) > 2000:
+        d = d[:2000].rstrip()
     return d
 
 
+def _trim_backend_no_space_limit(s: str, max_bytes: int) -> str:
+    tokens = [t for t in re.split(r"\s+", s.strip()) if t]
+    acc = []
+    for tok in tokens:
+        trial = (" ".join(acc + [tok])).strip()
+        if _no_space_bytes_len(trial) <= max_bytes:
+            acc.append(tok)
+        else:
+            break
+    return " ".join(acc).strip()
+
+
 def sanitize_backend_keywords_en(backend: str, already_used_text: str = "") -> str:
+    # Clean, dedupe words, enforce max 249 BYTES (spaces not counted)
     b = _strip_html(backend)
     b = _remove_forbidden(b)
-    used = _words_set(already_used_text)
+
+    # remove words present in surface copy
+    used = set(re.findall(r"[a-z0-9]+", already_used_text.lower()))
     words = re.findall(r"[a-z0-9]+", b.lower())
     words = [w for w in words if w not in used]
-    clean = " ".join(dict.fromkeys(words))
-    return _limit_bytes(clean, 249)
+    clean = " ".join(dict.fromkeys(words))  # dedupe preserving order
+
+    # enforce max bytes ignoring spaces
+    clean = _trim_backend_no_space_limit(clean, 249)
+    return clean
 
 
 def lafuncionqueejecuta_listing_sanitizer_en(draft: Dict[str, object]) -> Dict[str, object]:

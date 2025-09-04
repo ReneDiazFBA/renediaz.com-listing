@@ -1,7 +1,7 @@
 # listing/app_listing_copywrite.py
 # UI de Copywriting para la pestaña "Copywriting" del Dashboard.
-# Muestra Title, 5 Bullets (<150 chars), Description y Backend (≤249 bytes).
-# Se alimenta de st.session_state["inputs_para_listing"] ya construido en Mercado->Cliente/Tabla.
+# Muestra Title, 5 Bullets, Description y Backend, con conteos exactos.
+# Backend: cuenta bytes ignorando espacios.
 
 import json
 import streamlit as st
@@ -28,7 +28,6 @@ def _export_buttons(draft: dict):
             use_container_width=True,
         )
     with col2:
-        # Export para backend search terms solos
         st.download_button(
             "⬇️ Backend Search Terms (.txt)",
             data=draft.get("search_terms", ""),
@@ -36,6 +35,11 @@ def _export_buttons(draft: dict):
             mime="text/plain",
             use_container_width=True,
         )
+
+
+def _no_space_bytes_len(s: str) -> int:
+    """Cuenta bytes en UTF-8 ignorando espacios."""
+    return len((s or "").replace(" ", "").encode("utf-8"))
 
 
 def mostrar_listing_copywrite(excel_data=None):
@@ -60,26 +64,20 @@ def mostrar_listing_copywrite(excel_data=None):
 
     st.divider()
 
-    # Controles mínimos (no intrusivos)
-    c1, c2, c3 = st.columns([1, 1, 2])
+    # Controles
+    c1, c2 = st.columns([1, 2])
     with c1:
         use_ai = st.toggle("Use AI (cheap)", value=True,
                            help="IA económica (gpt-4o-mini) si hay OPENAI_API_KEY. Si no, fallback 0$.")
-
     with c2:
         cost_saver = st.toggle(
             "Cost saver", value=True, help="Recorta el prompt/inputs para abaratar pruebas.")
-
-    with c3:
-        st.caption(
-            "Bullets < 150 chars · Backend ≤ 249 bytes (sanitizer EN aplicado)")
 
     if st.button("Generate copy", type="primary", use_container_width=True):
         try:
             draft = lafuncionqueejecuta_listing_copywrite(
                 inputs_df=df_inputs,
                 use_ai=use_ai,
-                # Modelos/params se toman de entorno si quieres: OPENAI_MODEL_COPY, etc.
                 cost_saver=cost_saver,
             )
             st.success("Borrador generado.")
@@ -93,29 +91,34 @@ def mostrar_listing_copywrite(excel_data=None):
         st.info("Aún no hay borrador. Haz clic en **Generate copy**.")
         return
 
-    # Render del borrador
+    # --- Render del borrador ---
     st.markdown("### Draft (EN)")
 
+    # Title
     st.markdown("**Title**")
-    st.code(draft.get("title", ""))
+    title = draft.get("title", "")
+    st.code(title)
+    st.caption(f"Length: {len(title)} chars")
 
-    st.markdown("**Bullets (5 · <150 chars)**")
+    # Bullets
+    st.markdown("**Bullets (5)**")
     bullets = draft.get("bullets", []) or []
     for i, b in enumerate(bullets[:5], 1):
         st.write(f"{i}. {b}")
+        st.caption(f"Length: {len(b)} chars")
 
+    # Description
     st.markdown("**Description**")
-    st.write(draft.get("description", ""))
+    description = draft.get("description", "")
+    st.write(description)
+    st.caption(f"Length: {len(description)} chars")
 
-    st.markdown("**Backend Search Terms (≤249 bytes)**")
+    # Backend
+    st.markdown("**Backend Search Terms**")
     backend = draft.get("search_terms", "")
     st.code(backend)
-
-    # Contadores útiles
-    st.caption(
-        f"Title chars: {len(draft.get('title',''))} | "
-        f"Backend bytes: {len((backend or '').encode('utf-8'))}/249"
-    )
+    backend_bytes = _no_space_bytes_len(backend)
+    st.caption(f"Length: {backend_bytes} bytes (spaces not counted)")
 
     st.divider()
     _export_buttons(draft)
