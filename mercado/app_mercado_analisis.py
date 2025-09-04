@@ -149,6 +149,9 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                     key="tabla_editable_contraste"
                 )
 
+                # >>> FIX: guardar edición en sesión
+                st.session_state["df_edit"] = edited
+
             from mercado.loader_inputs_listing import construir_inputs_listing
 
             st.session_state["inputs_para_listing"] = construir_inputs_listing(
