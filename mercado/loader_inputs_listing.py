@@ -1,32 +1,93 @@
+# mercado/loader_inputs_listing.py
+
 import streamlit as st
 import pandas as pd
+import re
 
 from listing.loader_listing_mercado import cargar_lemas_clusters
 
 
-def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.DataFrame:
+# ---------- Helpers de acceso a Excel / marca ----------
+def _get_excelfile_from_anywhere(excel_data_param):
+    """
+    Devuelve un pd.ExcelFile si existe en 'excel_data_param' o en st.session_state["excel_data"].
+    Si no existe, retorna None sin romper flujo.
+    """
+    if excel_data_param is not None:
+        return excel_data_param
+    try:
+        x = st.session_state.get("excel_data")
+        return x if x is not None else None
+    except Exception:
+        return None
+
+
+def _safe_get_brand_from_custdata(excel_data_param=None) -> str:
+    """
+    Lee la marca desde CustData!E12 (fila 12 base 1 => index 11, col E => index 4).
+    Devuelve "" si no existe o hay error.
+    """
+    try:
+        excel = _get_excelfile_from_anywhere(excel_data_param)
+        if excel is None:
+            return ""
+        if not hasattr(excel, "parse"):
+            return ""
+        df = excel.parse("CustData", header=None)
+        val = str(df.iloc[11, 4]).strip()
+        if not val or val.lower() == "nan":
+            return ""
+        return val
+    except Exception:
+        return ""
+
+
+# ---------- Robustez para clustering ya existente ----------
+def _cargar_lemas_clusters_robusto() -> pd.DataFrame:
+    # Prioridad 1: alias expuesto por el bridge en Listing
+    df = st.session_state.get("df_lemas_cluster")
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        return df
+
+    # Prioridad 2: artefacto nativo del módulo de Listing
+    df = st.session_state.get("listing_clusters")
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        return df
+
+    return pd.DataFrame()
+
+
+# ---------- Construcción principal ----------
+def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame, excel_data: pd.ExcelFile = None) -> pd.DataFrame:
+    """
+    Construye la tabla final de inputs para el listing.
+    - Quita 'Nombre sugerido' (si existía en resultados) y agrega fila de 'marca' desde CustData!E12.
+    - Integra atributos/variaciones (df_edit).
+    - Agrega tokens semánticos (clusters) y además seeds 'Core' (lemmas).
+    """
     data = []
 
-    # Nombre del producto
-    if nombre := resultados.get("nombre_producto"):
+    # 1) MARCA (reemplaza 'Nombre sugerido')
+    marca = _safe_get_brand_from_custdata(excel_data)
+    if marca:
         data.append({
-            "Tipo": "Nombre sugerido",
-            "Contenido": nombre.strip(),
+            "Tipo": "marca",
+            "Contenido": marca,
             "Etiqueta": "",
-            "Fuente": "Reviews"
+            "Fuente": "Formulario"
         })
 
-    # Descripción
+    # 2) Descripción breve (se mantiene)
     if descripcion := resultados.get("descripcion"):
         data.append({
             "Tipo": "Descripción breve",
-            "Contenido": descripcion.strip(),
+            "Contenido": str(descripcion).strip(),
             "Etiqueta": "",
             "Fuente": "Reviews"
         })
 
-    # Beneficios
-    for linea in resultados.get("beneficios", "").split("\n"):
+    # 3) Beneficios
+    for linea in str(resultados.get("beneficios", "")).split("\n"):
         linea = linea.strip("-• ").strip()
         if linea:
             data.append({
@@ -36,17 +97,17 @@ def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.Data
                 "Fuente": "Reviews"
             })
 
-    # Buyer persona
+    # 4) Buyer persona
     if persona := resultados.get("buyer_persona"):
         data.append({
             "Tipo": "Buyer persona",
-            "Contenido": persona.strip(),
+            "Contenido": str(persona).strip(),
             "Etiqueta": "",
             "Fuente": "Reviews"
         })
 
-    # Pros / Cons
-    pros_cons_raw = resultados.get("pros_cons", "")
+    # 5) Pros / Cons → Beneficio / Obstáculo
+    pros_cons_raw = str(resultados.get("pros_cons", ""))
     if "PROS:" in pros_cons_raw.upper():
         secciones = pros_cons_raw.split("CONS:")
         pros = secciones[0].replace("PROS:", "").split("\n")
@@ -70,8 +131,8 @@ def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.Data
                     "Fuente": "Reviews"
                 })
 
-    # Emociones
-    for linea in resultados.get("emociones", "").split("\n"):
+    # 6) Emociones
+    for linea in str(resultados.get("emociones", "")).split("\n"):
         linea = linea.strip("-• ").strip()
         if linea:
             data.append({
@@ -81,25 +142,25 @@ def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.Data
                 "Fuente": "Reviews"
             })
 
-    # Léxico editorial
+    # 7) Léxico editorial
     if lexico := resultados.get("lexico_editorial"):
         data.append({
             "Tipo": "Léxico editorial",
-            "Contenido": lexico.strip(),
+            "Contenido": str(lexico).strip(),
             "Etiqueta": "",
             "Fuente": "Reviews"
         })
 
-    # Visuales
+    # 8) Visuales (brief)
     if visual := resultados.get("visuales"):
         data.append({
             "Tipo": "Visual",
-            "Contenido": visual.strip(),
+            "Contenido": str(visual).strip(),
             "Etiqueta": "",
             "Fuente": "IA"
         })
 
-    # Atributos IA + Variaciones desde tabla editable
+    # 9) Atributos IA + Variaciones desde tabla editable (df_edit)
     if df_edit is not None and not df_edit.empty:
         for _, row in df_edit.iterrows():
             atributo = row.get("Atributo IA")
@@ -122,8 +183,10 @@ def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.Data
                                 "Fuente": "IA"
                             })
 
+    # Construcción inicial del DF
     df = pd.DataFrame(data)
-    df = agregar_semantico_a_inputs(df)  # <- integración aquí
+    df = agregar_semantico_a_inputs(df)  # tokens semánticos (clusters)
+    df = agregar_core_seeds(df)          # seeds 'Core' (lemmas)
     return df.dropna(how="all")
 
 
@@ -138,47 +201,29 @@ def cargar_inputs_para_listing() -> pd.DataFrame:
         return pd.DataFrame()
 
 
-# >>> RD_FIX: helper robusto para tomar clusters desde session_state si el loader original no trae datos
-def _cargar_lemas_clusters_robusto() -> pd.DataFrame:
-    # Prioridad 1: alias expuesto por el bridge en Listing
-    df = st.session_state.get("df_lemas_cluster")
-    if isinstance(df, pd.DataFrame) and not df.empty:
-        return df
-
-    # Prioridad 2: artefacto nativo del módulo de Listing
-    df = st.session_state.get("listing_clusters")
-    if isinstance(df, pd.DataFrame) and not df.empty:
-        return df
-
-    return pd.DataFrame()
-# <<< RD_FIX
-
-
+# ---------- Semántico: clustering base ----------
 def agregar_semantico_a_inputs(df: pd.DataFrame) -> pd.DataFrame:
     df_sem = cargar_lemas_clusters()
     if df_sem.empty:
-        # >>> RD_FIX: fallback si el loader original no devolvió nada
         df_sem = _cargar_lemas_clusters_robusto()
-        # <<< RD_FIX
         if df_sem.empty:
             return df
 
-    # >>> RD_FIX: normalización defensiva
+    # Normalización defensiva
+    df_sem = df_sem.copy()
     if "token_lema" not in df_sem.columns:
-        posibles = [c for c in df_sem.columns if c.lower() == "token"]
-        df_sem = df_sem.copy()
+        posibles = [c for c in df_sem.columns if c.lower() in (
+            "token", "lemma", "lema", "token_lema")]
         if posibles:
             df_sem["token_lema"] = df_sem[posibles[0]].astype(str)
         else:
             df_sem["token_lema"] = df_sem.iloc[:, 0].astype(str)
 
     if "cluster" not in df_sem.columns:
-        df_sem = df_sem.copy()
         if "Cluster" in df_sem.columns:
             df_sem["cluster"] = df_sem["Cluster"]
         else:
             df_sem["cluster"] = "?"
-    # <<< RD_FIX
 
     bloque = pd.DataFrame({
         "Tipo": "Token Semántico",
@@ -188,3 +233,60 @@ def agregar_semantico_a_inputs(df: pd.DataFrame) -> pd.DataFrame:
     }).drop_duplicates()
 
     return pd.concat([df, bloque], ignore_index=True)
+
+
+# ---------- Seeds desde lemmas 'Core' ----------
+def agregar_core_seeds(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Agrega filas 'seed' a partir de lemmas cuyo tier sea Core (robusto a distintos nombres de columna).
+    - Tipo = 'seed'
+    - Contenido = token_lema
+    - Etiqueta = 'lemma'
+    - Fuente = 'core'
+    """
+    df_sem = _cargar_lemas_clusters_robusto()
+    if df_sem.empty:
+        # intenta también desde el loader principal
+        df_sem = cargar_lemas_clusters()
+        if df_sem.empty:
+            return df
+
+    df_sem = df_sem.copy()
+
+    # Columnas canónicas
+    token_col = "token_lema"
+    if token_col not in df_sem.columns:
+        posibles = [c for c in df_sem.columns if c.lower() in (
+            "token", "lemma", "lema", "token_lema")]
+        token_col = posibles[0] if posibles else df_sem.columns[0]
+
+    # Detectar 'Core' en alguna columna de tier
+    core_mask = pd.Series([False] * len(df_sem))
+    for col in df_sem.columns:
+        if re.search(r"tier|origen|categoria|group|nivel", col, flags=re.I):
+            core_mask = core_mask | df_sem[col].astype(
+                str).str.contains(r"\bcore\b", case=False, regex=True)
+
+    # Si no encontramos explícitamente, intenta por etiqueta/cluster que contenga 'core'
+    if not core_mask.any():
+        for col in df_sem.columns:
+            core_mask = core_mask | df_sem[col].astype(
+                str).str.contains(r"\bcore\b", case=False, regex=True)
+
+    seeds = df_sem.loc[core_mask, token_col].dropna().astype(
+        str).unique().tolist()
+    if not seeds:
+        return df
+
+    bloque = pd.DataFrame({
+        "Tipo": "seed",
+        "Contenido": seeds,
+        "Etiqueta": "lemma",
+        "Fuente": "core"
+    })
+
+    # Evitar duplicados exactos (por si ya existían)
+    df_out = pd.concat([df, bloque], ignore_index=True)
+    df_out.drop_duplicates(
+        subset=["Tipo", "Contenido", "Etiqueta", "Fuente"], inplace=True)
+    return df_out
