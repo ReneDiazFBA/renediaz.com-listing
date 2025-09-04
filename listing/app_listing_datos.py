@@ -9,6 +9,7 @@ from listing.app_listing_tokenizacion import (
     mostrar_tokens_lematizados,
     mostrar_clusters_semanticos,
     mostrar_embeddings_visualizacion,
+    mostrar_preview_inputs_listing,  # <<< añadido
 )
 
 
@@ -44,8 +45,16 @@ def mostrar_listing(excel_data: Optional[object] = None):
         mostrar_embeddings_visualizacion(excel_data)
         st.divider()
         mostrar_clusters_semanticos(excel_data)
+        st.divider()
+        # Vista previa de inputs finales (incluye Marca / Atributos / Variaciones)
+        mostrar_preview_inputs_listing()
 
     elif subvista == "copywrite":
+        # Mostrar la vista previa también en Copywriting para validar antes de generar el copy
+        st.subheader("Vista previa para listing")
+        mostrar_preview_inputs_listing()
+        st.divider()
+
         from listing.app_listing_copywrite import mostrar_listing_copywrite
         mostrar_listing_copywrite(excel_data)
 
