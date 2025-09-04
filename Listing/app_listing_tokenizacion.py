@@ -312,17 +312,32 @@ def mostrar_preview_inputs_listing():
         st.info("Aún no hay inputs. Genera la tabla desde Mercado → Cliente / Tabla.")
         return
 
-    # Conteo por Tipo
-    st.caption("Conteo por Tipo")
-    counts = df["Tipo"].value_counts().reset_index()
-    counts.columns = ["Tipo", "Cantidad"]
-    st.dataframe(counts, use_container_width=True)
+    # ---- Normalizador para Tipo (maneja tildes y mayúsculas)
+    def _norm(s: pd.Series) -> pd.Series:
+        try:
+            import unicodedata
+            s = s.astype(str).str.strip()
+            s = s.apply(lambda x: ''.join(c for c in unicodedata.normalize(
+                'NFKD', x) if not unicodedata.combining(c)))
+            return s.str.lower()
+        except Exception:
+            return s.astype(str).str.strip().str.lower()
 
-    # Bloques clave: Marca, Atributo y Variación
+    tipo_norm = _norm(
+        df["Tipo"]) if "Tipo" in df.columns else pd.Series([], dtype=str)
+
+    # Conteo por Tipo (normalizado) para diagnóstico
+    st.caption("Conteo por Tipo (normalizado)")
+    counts = tipo_norm.value_counts().reset_index()
+    counts.columns = ["Tipo (norm)", "Cantidad"]
+    st.dataframe(counts, use_container_width=True, hide_index=True)
+
+    # ---- Bloques clave: Marca, Atributo y Variación (robusto a tildes)
     col1, col2 = st.columns([1, 2])
     with col1:
         st.markdown("**Marca**")
-        df_m = df[df["Tipo"].str.lower() == "marca"]
+        mask_marca = tipo_norm.eq("marca")
+        df_m = df.loc[mask_marca]
         if not df_m.empty:
             st.dataframe(df_m[["Contenido", "Fuente"]],
                          use_container_width=True, hide_index=True)
@@ -330,19 +345,25 @@ def mostrar_preview_inputs_listing():
             st.write("—")
 
         st.markdown("**Atributos**")
-        df_a = df[df["Tipo"] == "Atributo"]
+        # coincide con 'Atributo' / 'atributo'
+        mask_attr = tipo_norm.eq("atributo")
+        df_a = df.loc[mask_attr]
         if not df_a.empty:
-            st.dataframe(df_a[["Contenido", "Etiqueta", "Fuente"]],
-                         use_container_width=True, hide_index=True)
+            cols = [c for c in ["Contenido", "Etiqueta",
+                                "Fuente"] if c in df_a.columns]
+            st.dataframe(df_a[cols], use_container_width=True, hide_index=True)
         else:
             st.write("—")
 
     with col2:
         st.markdown("**Variaciones**")
-        df_v = df[df["Tipo"] == "Variación"]
+        # 'variación' sin tilde -> 'variacion' normalizado
+        mask_var = tipo_norm.eq("variacion")
+        df_v = df.loc[mask_var]
         if not df_v.empty:
-            st.dataframe(df_v[["Contenido", "Etiqueta", "Fuente"]],
-                         use_container_width=True, hide_index=True)
+            cols = [c for c in ["Contenido", "Etiqueta",
+                                "Fuente"] if c in df_v.columns]
+            st.dataframe(df_v[cols], use_container_width=True, hide_index=True)
         else:
             st.write("—")
 

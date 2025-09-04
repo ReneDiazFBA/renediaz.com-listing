@@ -137,6 +137,7 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
             if df_edit is None or df_edit.empty:
                 st.warning(
                     "No se encontraron atributos relevantes en CustData.")
+                edited = pd.DataFrame()
             else:
                 st.caption(
                     "Puedes editar directamente esta tabla. Las columnas vacías o filas vacías serán ignoradas."
@@ -149,14 +150,16 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                     key="tabla_editable_contraste"
                 )
 
-                # >>> FIX: guardar edición en sesión
-                st.session_state["df_edit"] = edited
+            # <<< persistimos la tabla editada para reconstrucciones y para Listing Preview
+            st.session_state["df_edit"] = edited
 
             from mercado.loader_inputs_listing import construir_inputs_listing
 
             st.session_state["inputs_para_listing"] = construir_inputs_listing(
                 st.session_state.get("resultados_mercado", {}),
-                edited
+                edited,
+                # pasa Excel para leer la marca (CustData!E12)
+                excel_data=excel_data
             )
 
     elif subvista == "editorial":
