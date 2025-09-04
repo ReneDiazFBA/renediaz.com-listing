@@ -160,28 +160,43 @@ def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame, excel_data
             "Fuente": "IA"
         })
 
-    # 9) Atributos IA + Variaciones desde tabla editable (df_edit)
+    # 9) Atributos/Variaciones desde Contraste (df_edit)
+    # Regla:
+    # - Si SOLO hay Valor 1 (y está lleno):    Tipo=Atributo, Contenido=Valor 1, Etiqueta="Atributo Cliente", Fuente="Contraste"
+    # - Si hay 2+ valores (entre Valor 1..4):  Tipo=Variación para CADA valor (incluye Valor 1), Etiqueta="Atributo Cliente", Fuente="Contraste"
+    # - Si Valor 1 está vacío: se ignora el atributo por completo.
     if df_edit is not None and not df_edit.empty:
         for _, row in df_edit.iterrows():
-            atributo = row.get("Atributo IA")
-            if isinstance(atributo, str) and atributo.strip():
-                atributo = atributo.strip()
+            # Tomar valores no vacíos entre Valor 1..4
+            vals = []
+            for k in ("Valor 1", "Valor 2", "Valor 3", "Valor 4"):
+                if k in row and pd.notna(row[k]):
+                    sval = str(row[k]).strip()
+                    if sval:
+                        vals.append((k, sval))
+
+            # Si Valor 1 está vacío o no existe, ignorar este atributo
+            v1 = next((v for (k, v) in vals if k == "Valor 1"), "")
+            if not v1:
+                continue
+
+            if len(vals) == 1:
+                # SOLO Valor 1 → Atributo
                 data.append({
                     "Tipo": "Atributo",
-                    "Contenido": atributo,
-                    "Etiqueta": "",
-                    "Fuente": "IA"
+                    "Contenido": v1,
+                    "Etiqueta": "Atributo Cliente",
+                    "Fuente": "Contraste"
                 })
-                for col in row.index:
-                    if col.startswith("Valor") and pd.notna(row[col]):
-                        variacion = str(row[col]).strip()
-                        if variacion:
-                            data.append({
-                                "Tipo": "Variación",
-                                "Contenido": variacion,
-                                "Etiqueta": atributo,
-                                "Fuente": "IA"
-                            })
+            else:
+                # 2 o más valores → TODAS como Variación (incluye Valor 1)
+                for _, sval in vals:
+                    data.append({
+                        "Tipo": "Variación",
+                        "Contenido": sval,
+                        "Etiqueta": "Atributo Cliente",
+                        "Fuente": "Contraste"
+                    })
 
     # Construcción inicial del DF
     df = pd.DataFrame(data)
