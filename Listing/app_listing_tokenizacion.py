@@ -294,20 +294,6 @@ def mostrar_preview_inputs_listing():
     st.subheader("Vista previa — Inputs para Listing")
     df = st.session_state.get("inputs_para_listing", pd.DataFrame())
 
-    # Fallback: si no existe en sesión, intenta construir con lo disponible
-    if (not isinstance(df, pd.DataFrame)) or df.empty:
-        try:
-            from mercado.loader_inputs_listing import construir_inputs_listing
-            resultados = st.session_state.get("resultados_mercado", {})
-            df_edit = st.session_state.get("df_edit", pd.DataFrame())
-            excel = st.session_state.get("excel_data", None)
-            if resultados and isinstance(df_edit, pd.DataFrame) and not df_edit.empty:
-                df = construir_inputs_listing(
-                    resultados, df_edit, excel_data=excel)
-                st.session_state["inputs_para_listing"] = df
-        except Exception:
-            pass
-
     if not isinstance(df, pd.DataFrame) or df.empty:
         st.info("Aún no hay inputs. Genera la tabla desde Mercado → Cliente / Tabla.")
         return
