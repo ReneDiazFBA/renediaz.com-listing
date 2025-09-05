@@ -45,6 +45,10 @@ def _get_resultados_mercado() -> Dict:
 
 
 def _get_df_edit_contraste() -> pd.DataFrame:
+    # prioriza la versión persistida con Tipo
+    df = st.session_state.get("df_contraste_edit")
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        return df
     for key in ("df_edit", "df_edit_atributos"):
         df = st.session_state.get(key)
         if isinstance(df, pd.DataFrame) and not df.empty:
@@ -62,6 +66,10 @@ def _get_df_sem() -> pd.DataFrame:
         if isinstance(df, pd.DataFrame) and not df.empty:
             return df.copy()
     return pd.DataFrame()
+
+# ------------------------------------------------------------
+# Utilidades varias
+# ------------------------------------------------------------
 
 
 def _split_lines(blob: str) -> List[str]:
@@ -119,13 +127,14 @@ def construir_inputs_listing(resultados: dict = None,
                              df_edit: pd.DataFrame = None,
                              excel_data: object = None) -> pd.DataFrame:
     """
-    Construye UNA sola tabla final con todo lo que necesitas, SIN depender de Mercado.
+    Construye UNA sola tabla final con todo lo que necesitas.
     - Marca (CustData!B12)
     - Reviews: Descripción breve, Beneficios (1/fila), Buyer persona,
                Pros (1/fila), Cons (1/fila),
                Emociones positivas/negativas (1/fila) o 'Emoción' fallback,
                Tokens diferenciadores (+)/(-) (1/fila) o genérico 'Token diferenciador'
-    - Contraste Cliente: si solo hay 'Valor 1' => Atributo; si hay 2+ => todas son Variación
+    - Contraste Cliente: usa DIRECTO la columna 'Tipo' (Atributo/Variación) si viene en df_edit/df_contraste_edit,
+                         desdoblando cada Valor 1..4 en filas (Contenido). Si no hay 'Tipo', decide por conteo.
     - Léxico editorial (texto)
     - Recomendaciones visuales (texto)
     - Semántico (Listing): Token semántico (cluster) y Seeds Core
@@ -196,26 +205,54 @@ def construir_inputs_listing(resultados: dict = None,
             filas.append({"Tipo": "Token diferenciador",
                          "Contenido": t, "Etiqueta": "", "Fuente": "Reviews"})
 
-    # 3) Contraste del cliente (df_edit si existe)
+    # 3) Contraste del cliente — usa 'Tipo' si viene; si no, decide por conteo
     dfe = df_edit if isinstance(
         df_edit, pd.DataFrame) else _get_df_edit_contraste()
     if isinstance(dfe, pd.DataFrame) and not dfe.empty:
-        for _, row in dfe.iterrows():
+        dfe_local = dfe.copy()
+
+        # Detecta columnas Valor 1..4 de forma robusta
+        val_cols = []
+        for c in dfe_local.columns:
+            if re.search(r"(?:^|[^A-Za-z])(valor|value)\s*_?\s*([1-4])(?:[^0-9]|$)", str(c), flags=re.I):
+                val_cols.append(c)
+        # Ordenar por índice numérico de valor si está presente
+
+        def _orden_val(cname: str) -> int:
+            m = re.findall(r"[1-4]", str(cname))
+            return int(m[0]) if m else 9
+        val_cols = sorted(val_cols, key=_orden_val)
+
+        has_tipo = "Tipo" in dfe_local.columns
+
+        for _, row in dfe_local.iterrows():
+            # Extrae todos los valores no vacíos
             values = []
-            for k in ("Valor 1", "Valor 2", "Valor 3", "Valor 4"):
-                if k in row and pd.notna(row[k]):
-                    s = str(row[k]).strip()
-                    if s:
-                        values.append(s)
+            for c in val_cols:
+                v = str(row.get(c, "")).strip()
+                if v and v.lower() not in ("nan", "none", "—", "-", "n/a", "na", ""):
+                    values.append(v)
             if not values:
                 continue
-            if len(values) == 1:
-                filas.append(
-                    {"Tipo": "Atributo", "Contenido": values[0], "Etiqueta": "Atributo Cliente", "Fuente": "Contraste"})
+
+            if has_tipo:
+                tipo = str(row.get("Tipo", "")).strip()
+                tipo = "Variación" if tipo.lower() in ("variacion", "variación") else (
+                    "Atributo" if tipo.lower() == "atributo" else "")
+                if not tipo:
+                    # fallback si el usuario borró Tipo
+                    tipo = "Atributo" if len(values) == 1 else "Variación"
             else:
-                for v in values:
-                    filas.append({"Tipo": "Variación", "Contenido": v,
-                                 "Etiqueta": "Atributo Cliente", "Fuente": "Contraste"})
+                # sin 'Tipo' en df_edit → decidir por conteo
+                tipo = "Atributo" if len(values) == 1 else "Variación"
+
+            for v in values:
+                filas.append({
+                    "Tipo": tipo,
+                    "Contenido": v,
+                    "Etiqueta": "Atributo Cliente",
+                    "Fuente": "Contraste",
+                })
 
     # 4) Léxico editorial
     if r.get("lexico_editorial"):
@@ -230,7 +267,7 @@ def construir_inputs_listing(resultados: dict = None,
     # 6) Semántico (clusters + seeds core)
     df_sem = _get_df_sem()
     if not df_sem.empty:
-        # token
+        # token (robusto)
         token_col = None
         for c in df_sem.columns:
             if c.lower() in ("token_lema", "token", "lemma", "lema"):
@@ -257,7 +294,7 @@ def construir_inputs_listing(resultados: dict = None,
                 "Tipo": "Token semántico",
                 "Contenido": token_val,
                 "Etiqueta": etiqueta,
-                "Fuente": "Listing"
+                "Fuente": "Listing",
             })
 
         # Seeds core (1/fila)
@@ -266,7 +303,7 @@ def construir_inputs_listing(resultados: dict = None,
                 "Tipo": "Seed core",
                 "Contenido": s,
                 "Etiqueta": "lemma",
-                "Fuente": "Listing"
+                "Fuente": "Listing",
             })
 
     # DataFrame final
@@ -285,5 +322,4 @@ def cargar_inputs_para_listing() -> pd.DataFrame:
     """
     Devuelve SIEMPRE la tabla unificada (no depende de que otra vista la haya guardado).
     """
-    # Preferimos construirla fresca para evitar “va-y-viene” de sesión.
     return construir_inputs_listing()

@@ -105,6 +105,7 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
             st.warning(
                 "Primero debes subir un archivo Excel en la sección Datos.")
         else:
+            # 1) Atributos del mercado (desde resultados de IA si existen; si no, fallback)
             resultados = st.session_state.get("resultados_mercado", {})
             atributos_raw = resultados.get("atributos_valorados", "")
 
@@ -116,10 +117,15 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
             else:
                 atributos_mercado = [
                     x.strip("-• ").lower()
-                    for x in atributos_raw.split("\n") if isinstance(x, str) and x.strip()
+                    for x in atributos_raw.split("\n")
+                    if isinstance(x, str) and x.strip()
                 ]
 
-            from mercado.funcional_mercado_contraste import comparar_atributos_mercado_cliente
+            # 2) Construir/recuperar la tabla de contraste (con columna Tipo automática)
+            from mercado.funcional_mercado_contraste import (
+                comparar_atributos_mercado_cliente,
+                _recompute_tipo,
+            )
 
             try:
                 df_edit = comparar_atributos_mercado_cliente(
@@ -134,24 +140,41 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                 edited = pd.DataFrame()
             else:
                 st.caption(
-                    "Puedes editar directamente esta tabla. Las columnas vacías o filas vacías serán ignoradas.")
+                    "Edita libremente. La columna **Tipo** (Atributo/Variación) se ajusta sola según los valores (Valor 1..4). Tus cambios persisten aunque cambies de módulo.")
                 edited = st.data_editor(
                     df_edit,
                     use_container_width=True,
                     num_rows="dynamic",
                     hide_index=True,
-                    key="tabla_editable_contraste"
+                    key="tabla_editable_contraste",
                 )
 
-            # Guardamos la edición en sesión (para referencia si la usas en otros módulos)
-            st.session_state["df_edit"] = edited
+        # 3) Recalcular Tipo tras edición y PERSISTIR (sin botones)
+        edited = _recompute_tipo(edited)
+        # persistente entre vistas
+        st.session_state["df_contraste_edit"] = edited.copy()
+        # compatibilidad con otros módulos
+        st.session_state["df_edit"] = edited.copy()
 
-            # Si aún quieres construir algo adicional, lo dejas; no estorba.
-            st.session_state["inputs_para_listing"] = construir_inputs_listing(
-                st.session_state.get("resultados_mercado", {}),
-                edited,
-                excel_data=excel_data
-            )
+        # 4) (Opcional) Construir inputs para Listing con lo EDITADO (Tipo ya correcto)
+        st.session_state["inputs_para_listing"] = construir_inputs_listing(
+            st.session_state.get("resultados_mercado", {}),
+            edited,
+            excel_data=excel_data,
+        )
+
+        # 5) Snapshot (pequeño diagnóstico)
+        if not edited.empty:
+            try:
+                tipos = edited.get("Tipo", pd.Series(
+                    [], dtype=str)).astype(str).str.lower()
+                n_attr = int((tipos == "atributo").sum())
+                n_var = int(((tipos == "variación") |
+                            (tipos == "variacion")).sum())
+                st.caption(
+                    f"Snapshot: Atributos = {n_attr} · Variaciones = {n_var} · Filas = {len(edited)}")
+            except Exception:
+                pass
 
     elif subvista == "editorial":
         st.subheader("Léxico Editorial extraído de los reviews")
