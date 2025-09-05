@@ -104,34 +104,45 @@ def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.Data
             "Fuente": "IA"
         })
 
-    # Atributos IA + Variaciones desde tabla editable
-    if df_edit is not None and not df_edit.empty:
+    # ------------------------------
+    # CONTRASTE (df_edit):
+    # - Etiqueta = valor de "Atributo Cliente" (si existe; fallback "Atributo Cliente")
+    # - Atributo IA (si existe) → Tipo="Atributo" con Etiqueta del cliente
+    # - Para cada "Valor*" no vacío → Tipo="Variación" con Etiqueta del cliente
+    # - Fuente = "Contraste"
+    # ------------------------------
+    if df_edit is not None and isinstance(df_edit, pd.DataFrame) and not df_edit.empty:
         for _, row in df_edit.iterrows():
-            atributo = row.get("Atributo IA")
-            if isinstance(atributo, str) and atributo.strip():
-                atributo = atributo.strip()
+            etiqueta_cliente = str(
+                row.get("Atributo Cliente", "")).strip() or "Atributo Cliente"
+
+            # 1) Atributo IA (si existe y tiene texto)
+            atributo_ia = row.get("Atributo IA")
+            if isinstance(atributo_ia, str) and atributo_ia.strip():
                 data.append({
                     "Tipo": "Atributo",
-                    "Contenido": atributo,
-                    "Etiqueta": "",
-                    "Fuente": "IA"
+                    "Contenido": atributo_ia.strip(),
+                    "Etiqueta": etiqueta_cliente,   # 👈 ahora etiqueta es el valor del cliente
+                    "Fuente": "Contraste"
                 })
-                for col in row.index:
-                    if col.startswith("Valor") and pd.notna(row[col]):
-                        variacion = str(row[col]).strip()
-                        if variacion:
-                            data.append({
-                                "Tipo": "Variación",
-                                "Contenido": variacion,
-                                "Etiqueta": atributo,
-                                "Fuente": "IA"
-                            })
+
+            # 2) Variaciones desde columnas Valor*
+            for col in row.index:
+                if str(col).lower().startswith("valor") and pd.notna(row[col]):
+                    variacion = str(row[col]).strip()
+                    if variacion:
+                        data.append({
+                            "Tipo": "Variación",
+                            "Contenido": variacion,
+                            "Etiqueta": etiqueta_cliente,  # 👈 etiqueta del cliente
+                            "Fuente": "Contraste"
+                        })
 
     # Agregar lemas con clusters semánticos
     df_semantic = cargar_lemas_clusters()
     if not df_semantic.empty:
         for _, row in df_semantic.iterrows():
-            token = row.get("token_lema", "").strip()
+            token = str(row.get("token_lema", "")).strip()
             cluster = row.get("cluster", "")
             if token:
                 data.append({
