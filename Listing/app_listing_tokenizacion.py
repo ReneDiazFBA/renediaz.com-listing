@@ -265,9 +265,16 @@ def mostrar_clusters_semanticos(excel_data=None):
 # ------------------------------------------------------------
 def mostrar_preview_inputs_listing():
     from mercado.loader_inputs_listing import construir_inputs_listing
+    import unicodedata as _ud
 
     st.subheader("Inputs unificados para generación de Listing")
 
+    # Mostrar la FUENTE de Atributo/Variación (texto confirmado vs. fallback tabla)
+    fuente = "Texto de contraste confirmado" if st.session_state.get(
+        "contraste_texto") else "Tabla de contraste (fallback)"
+    st.caption(f"Fuente de Atributo/Variación: **{fuente}**")
+
+    # Siempre construir desde la fuente actual
     df_edit = st.session_state.get(
         "df_contraste_edit",
         st.session_state.get("df_edit", st.session_state.get(
@@ -281,20 +288,24 @@ def mostrar_preview_inputs_listing():
     )
 
     if not isinstance(df, pd.DataFrame) or df.empty:
-        st.info("No hay datos aún. Ve a Mercado → Cliente, edita contraste y vuelve.")
+        st.info(
+            "No hay datos aún. Ve a Mercado → Cliente, confirma el texto o edita contraste y vuelve.")
         return
 
+    # Métricas rápidas para Atributos / Variaciones (robusto a acentos)
+    if "Tipo" in df.columns:
+        tipo = (
+            df["Tipo"]
+            .astype(str)
+            .str.strip()
+            .apply(lambda x: _ud.normalize("NFKD", x))
+            .str.encode("ascii", "ignore")
+            .str.decode("ascii")
+            .str.lower()
+        )
+        n_attr = int((tipo == "atributo").sum())
+        n_var = int((tipo == "variacion").sum())
+        st.caption(
+            f"Atributos: {n_attr} · Variaciones: {n_var} · Total filas: {len(df)}")
+
     st.dataframe(df, use_container_width=True, hide_index=True)
-
-
-# ------------------------------------------------------------
-# Export explícito (evita ImportError)
-# ------------------------------------------------------------
-__all__ = [
-    "mostrar_listing_tokenizacion",
-    "mostrar_tokens_priorizados",
-    "mostrar_tokens_lematizados",
-    "mostrar_embeddings_visualizacion",
-    "mostrar_clusters_semanticos",
-    "mostrar_preview_inputs_listing",
-]
