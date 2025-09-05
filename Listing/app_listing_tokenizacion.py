@@ -292,13 +292,9 @@ def mostrar_clusters_semanticos(excel_data=None):
 
 def mostrar_preview_inputs_listing():
     st.subheader("Vista previa — Inputs para Listing")
-    df = st.session_state.get("inputs_para_listing", pd.DataFrame())
-
-    if not isinstance(df, pd.DataFrame) or df.empty:
-        st.info("Aún no hay inputs. Genera la tabla desde Mercado → Cliente / Tabla.")
-        return
 
     # ---- Normalizador para Tipo (maneja tildes y mayúsculas)
+
     def _norm(s: pd.Series) -> pd.Series:
         try:
             import unicodedata
