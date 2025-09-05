@@ -263,15 +263,10 @@ def mostrar_clusters_semanticos(excel_data=None):
         st.session_state["df_lemas_cluster"] = _df.copy()
 
 
-# ------------------------------------------------------------
 # 6) VISTA PREVIA — lee DIRECTO la tabla final de Mercado
 # ------------------------------------------------------------
-# ------------------------------------------------------------
-# 6) VISTA PREVIA — lee DIRECTO la tabla final de Mercado
-# ------------------------------------------------------------
+
 def mostrar_preview_inputs_listing():
-    import pandas as pd
-    import streamlit as st
 
     st.subheader("Inputs (espejo 1:1 de Mercado → Tabla final)")
 
