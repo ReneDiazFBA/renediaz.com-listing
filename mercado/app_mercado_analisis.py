@@ -122,6 +122,7 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                 ]
 
             # 2) Construir/recuperar la tabla de contraste (con columna Tipo automática)
+            #    NOTA: si no tienes _recompute_tipo en tu módulo, quita su uso más abajo.
             from mercado.funcional_mercado_contraste import (
                 comparar_atributos_mercado_cliente,
                 _recompute_tipo,
@@ -140,7 +141,8 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                 edited = pd.DataFrame()
             else:
                 st.caption(
-                    "Edita libremente. La columna **Tipo** (Atributo/Variación) se ajusta sola según los valores (Valor 1..4). Tus cambios persisten aunque cambies de módulo.")
+                    "Edita libremente. La columna **Tipo** (Atributo/Variación) se ajusta sola según los valores (Valor 1..4). Tus cambios persisten aunque cambies de módulo."
+                )
                 edited = st.data_editor(
                     df_edit,
                     use_container_width=True,
@@ -149,33 +151,36 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
                     key="tabla_editable_contraste",
                 )
 
-        # 3) Recalcular Tipo tras edición y PERSISTIR (sin botones)
-        edited = _recompute_tipo(edited)
-        # persistente entre vistas
-        st.session_state["df_contraste_edit"] = edited.copy()
-        # compatibilidad con otros módulos
-        st.session_state["df_edit"] = edited.copy()
-        st.session_state["df_contraste_edit"] = edited.copy()
-
-        # 4) (Opcional) Construir inputs para Listing con lo EDITADO (Tipo ya correcto)
-        st.session_state["inputs_para_listing"] = construir_inputs_listing(
-            st.session_state.get("resultados_mercado", {}),
-            edited,
-            excel_data=excel_data,
-        )
-
-        # 5) Snapshot (pequeño diagnóstico)
-        if not edited.empty:
+            # 3) Recalcular Tipo tras edición y PERSISTIR (sin botones)
             try:
-                tipos = edited.get("Tipo", pd.Series(
-                    [], dtype=str)).astype(str).str.lower()
-                n_attr = int((tipos == "atributo").sum())
-                n_var = int(((tipos == "variación") |
-                            (tipos == "variacion")).sum())
-                st.caption(
-                    f"Snapshot: Atributos = {n_attr} · Variaciones = {n_var} · Filas = {len(edited)}")
+                edited = _recompute_tipo(edited)
             except Exception:
+                # Fallback: si no existe _recompute_tipo en tu módulo, deja la tabla tal cual
                 pass
+
+            # Persistencia entre vistas (usa ambas claves que emplean otras vistas)
+            st.session_state["df_contraste_edit"] = edited.copy()
+            st.session_state["df_edit"] = edited.copy()
+
+            # 4) Construir inputs para Listing con lo EDITADO (Tipo ya correcto)
+            st.session_state["inputs_para_listing"] = construir_inputs_listing(
+                st.session_state.get("resultados_mercado", {}),
+                edited,
+                excel_data=excel_data,
+            )
+
+            # 5) Snapshot (diagnóstico)
+            if not edited.empty:
+                try:
+                    tipos = edited.get("Tipo", pd.Series(
+                        [], dtype=str)).astype(str).str.lower()
+                    n_attr = int((tipos == "atributo").sum())
+                    n_var = int(((tipos == "variación") |
+                                (tipos == "variacion")).sum())
+                    st.caption(
+                        f"Snapshot: Atributos = {n_attr} · Variaciones = {n_var} · Filas = {len(edited)}")
+                except Exception:
+                    pass
 
     elif subvista == "editorial":
         st.subheader("Léxico Editorial extraído de los reviews")

@@ -51,7 +51,6 @@ def _get_df_edit_contraste() -> pd.DataFrame:
             return df
     return pd.DataFrame()
 
-
 # ------------------------------------------------------------
 # Trae clusters/lemmas desde sesión con nombres conocidos
 # ------------------------------------------------------------
@@ -213,8 +212,8 @@ def construir_inputs_listing(resultados: dict = None,
         for c in dfe_local.columns:
             if re.search(r"(?:^|[^A-Za-z])(valor|value)\s*_?\s*([1-4])(?:[^0-9]|$)", str(c), flags=re.I):
                 val_cols.append(c)
-        # Ordenar por índice numérico de valor si está presente
 
+        # Ordenar por índice numérico de valor si está presente
         def _orden_val(cname: str) -> int:
             m = re.findall(r"[1-4]", str(cname))
             return int(m[0]) if m else 9
