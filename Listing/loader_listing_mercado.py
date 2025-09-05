@@ -4,7 +4,7 @@ import re
 
 
 # ============================================================
-#  Helpers
+# Helpers
 # ============================================================
 
 def cargar_lemas_clusters() -> pd.DataFrame:
@@ -18,7 +18,7 @@ def cargar_lemas_clusters() -> pd.DataFrame:
 
 
 # ============================================================
-#  Constructor de la tabla final
+# Constructor de la tabla final
 # ============================================================
 
 def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.DataFrame:
@@ -32,7 +32,11 @@ def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.Data
       - Emociones
       - Léxico editorial
       - Visual
-      - Contraste (Atributo/Variación) con Etiqueta = valor de "Atributo Cliente"
+      - Contraste:
+          * Etiqueta = valor de "Atributo Cliente" (estrictamente)
+          * Tipo: usa columna "Tipo" si existe (Atributo/Variación); si no, 1 valor -> Atributo, 2+ -> Variación
+          * Contenido = cada Valor 1..4 no vacío
+          * Fuente = "Contraste"
       - Tokens semánticos (si hay clusters)
     """
     data = []
@@ -40,92 +44,95 @@ def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.Data
     # ------------------------------
     # Reviews básicos
     # ------------------------------
-    if nombre := resultados.get("nombre_producto"):
-        data.append({
-            "Tipo": "Nombre sugerido",
-            "Contenido": nombre.strip(),
-            "Etiqueta": "",
-            "Fuente": "Reviews"
-        })
-
-    if descripcion := resultados.get("descripcion"):
-        data.append({
-            "Tipo": "Descripción breve",
-            "Contenido": descripcion.strip(),
-            "Etiqueta": "",
-            "Fuente": "Reviews"
-        })
-
-    for linea in str(resultados.get("beneficios", "")).split("\n"):
-        linea = linea.strip("-• ").strip()
-        if linea:
+    if isinstance(resultados, dict):
+        if (nombre := resultados.get("nombre_producto")):
             data.append({
-                "Tipo": "Beneficio",
-                "Contenido": linea,
-                "Etiqueta": "Positivo",
+                "Tipo": "Nombre sugerido",
+                "Contenido": str(nombre).strip(),
+                "Etiqueta": "",
                 "Fuente": "Reviews"
             })
 
-    if persona := resultados.get("buyer_persona"):
-        data.append({
-            "Tipo": "Buyer persona",
-            "Contenido": persona.strip(),
-            "Etiqueta": "",
-            "Fuente": "Reviews"
-        })
+        if (descripcion := resultados.get("descripcion")):
+            data.append({
+                "Tipo": "Descripción breve",
+                "Contenido": str(descripcion).strip(),
+                "Etiqueta": "",
+                "Fuente": "Reviews"
+            })
 
-    pros_cons_raw = str(resultados.get("pros_cons", ""))
-    if "PROS:" in pros_cons_raw.upper():
-        secciones = pros_cons_raw.split("CONS:")
-        pros = secciones[0].replace("PROS:", "").split("\n")
-        cons = secciones[1].split("\n") if len(secciones) > 1 else []
-        for linea in pros:
+        beneficios = str(resultados.get("beneficios", "")).split("\n")
+        for linea in beneficios:
             linea = linea.strip("-• ").strip()
             if linea:
                 data.append({
                     "Tipo": "Beneficio",
                     "Contenido": linea,
-                    "Etiqueta": "PRO",
-                    "Fuente": "Reviews"
-                })
-        for linea in cons:
-            linea = linea.strip("-• ").strip()
-            if linea:
-                data.append({
-                    "Tipo": "Obstáculo",
-                    "Contenido": linea,
-                    "Etiqueta": "CON",
+                    "Etiqueta": "Positivo",
                     "Fuente": "Reviews"
                 })
 
-    for linea in str(resultados.get("emociones", "")).split("\n"):
-        linea = linea.strip("-• ").strip()
-        if linea:
+        if (persona := resultados.get("buyer_persona")):
             data.append({
-                "Tipo": "Emoción",
-                "Contenido": linea,
+                "Tipo": "Buyer persona",
+                "Contenido": str(persona).strip(),
                 "Etiqueta": "",
                 "Fuente": "Reviews"
             })
 
-    if lexico := resultados.get("lexico_editorial"):
-        data.append({
-            "Tipo": "Léxico editorial",
-            "Contenido": lexico.strip(),
-            "Etiqueta": "",
-            "Fuente": "Reviews"
-        })
+        pros_cons_raw = str(resultados.get("pros_cons", ""))
+        if "PROS:" in pros_cons_raw.upper():
+            secciones = pros_cons_raw.split("CONS:")
+            pros = secciones[0].replace("PROS:", "").split("\n")
+            cons = secciones[1].split("\n") if len(secciones) > 1 else []
+            for linea in pros:
+                linea = linea.strip("-• ").strip()
+                if linea:
+                    data.append({
+                        "Tipo": "Beneficio",
+                        "Contenido": linea,
+                        "Etiqueta": "PRO",
+                        "Fuente": "Reviews"
+                    })
+            for linea in cons:
+                linea = linea.strip("-• ").strip()
+                if linea:
+                    data.append({
+                        "Tipo": "Obstáculo",
+                        "Contenido": linea,
+                        "Etiqueta": "CON",
+                        "Fuente": "Reviews"
+                    })
 
-    if visual := resultados.get("visuales"):
-        data.append({
-            "Tipo": "Visual",
-            "Contenido": visual.strip(),
-            "Etiqueta": "",
-            "Fuente": "IA"
-        })
+        emociones = str(resultados.get("emociones", "")).split("\n")
+        for linea in emociones:
+            linea = linea.strip("-• ").strip()
+            if linea:
+                data.append({
+                    "Tipo": "Emoción",
+                    "Contenido": linea,
+                    "Etiqueta": "",
+                    "Fuente": "Reviews"
+                })
+
+        if (lexico := resultados.get("lexico_editorial")):
+            data.append({
+                "Tipo": "Léxico editorial",
+                "Contenido": str(lexico).strip(),
+                "Etiqueta": "",
+                "Fuente": "Reviews"
+            })
+
+        if (visual := resultados.get("visuales")):
+            data.append({
+                "Tipo": "Visual",
+                "Contenido": str(visual).strip(),
+                "Etiqueta": "",
+                "Fuente": "IA"
+            })
 
     # ------------------------------
-    # CONTRASTE (df_edit) — Etiqueta = valor de "Atributo Cliente"
+    # CONTRASTE (df_edit) — Etiqueta = valor EXACTO de "Atributo Cliente"
     # ------------------------------
     if df_edit is not None and isinstance(df_edit, pd.DataFrame) and not df_edit.empty:
         # Detectar columnas Valor 1..4 de forma robusta (Valor/Value con o sin guión/bajo/espacio)
@@ -142,11 +149,11 @@ def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.Data
         has_tipo = "Tipo" in df_edit.columns
 
         for _, row in df_edit.iterrows():
-            # Etiqueta = valor en "Atributo Cliente" (si existe). Fallback: Atributo IA, luego literal.
+            # Etiqueta = valor de "Atributo Cliente" (sin fallback)
             etiqueta_cliente = str(row.get("Atributo Cliente", "")).strip()
             if not etiqueta_cliente:
-                etiqueta_cliente = str(
-                    row.get("Atributo IA", "")).strip() or "Atributo Cliente"
+                # Si no hay Atributo Cliente, no generamos filas de contraste (evitamos literales)
+                continue
 
             # Extraer valores no vacíos de Valor 1..4
             values = []
@@ -154,6 +161,10 @@ def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.Data
                 v = str(row.get(c, "")).strip()
                 if v and v.lower() not in ("nan", "none", "—", "-", "n/a", "na", ""):
                     values.append(v)
+
+            if not values:
+                # sin valores no generamos salida (regla estricta)
+                continue
 
             # Determinar tipo (preferir columna 'Tipo' si viene)
             if has_tipo:
@@ -167,19 +178,7 @@ def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.Data
             else:
                 tipo = "Atributo" if len(values) == 1 else "Variación"
 
-            # Sin valores: si hay Atributo IA, al menos registrar como Atributo
-            if not values:
-                atributo_ia = str(row.get("Atributo IA", "")).strip()
-                if atributo_ia:
-                    data.append({
-                        "Tipo": "Atributo",
-                        "Contenido": atributo_ia,
-                        "Etiqueta": etiqueta_cliente,
-                        "Fuente": "Contraste"
-                    })
-                continue
-
-            # Con valores:
+            # Emitir filas
             if tipo == "Atributo" and len(values) == 1:
                 data.append({
                     "Tipo": "Atributo",
@@ -216,11 +215,13 @@ def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.Data
 
     # Salida
     df = pd.DataFrame(data)
-    return df.dropna(hoy="all") if hasattr(pd.DataFrame, "dropna") else df.dropna(how="all")
+    if not df.empty:
+        df.dropna(how="all", inplace=True)
+    return df
 
 
 # ============================================================
-#  Carga desde sesión (compat)
+# Carga desde sesión (compat)
 # ============================================================
 
 def cargar_inputs_para_listing() -> pd.DataFrame:
