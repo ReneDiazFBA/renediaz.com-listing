@@ -45,15 +45,12 @@ def _get_resultados_mercado() -> Dict:
 
 
 def _get_df_edit_contraste() -> pd.DataFrame:
-    # prioriza la versión persistida con Tipo
-    df = st.session_state.get("df_contraste_edit")
-    if isinstance(df, pd.DataFrame) and not df.empty:
-        return df
-    for key in ("df_edit", "df_edit_atributos"):
+    for key in ("df_contraste_edit", "df_edit", "df_edit_atributos"):
         df = st.session_state.get(key)
         if isinstance(df, pd.DataFrame) and not df.empty:
             return df
     return pd.DataFrame()
+
 
 # ------------------------------------------------------------
 # Trae clusters/lemmas desde sesión con nombres conocidos

@@ -155,6 +155,7 @@ def mostrar_analisis_mercado(excel_data: Optional[object] = None):
         st.session_state["df_contraste_edit"] = edited.copy()
         # compatibilidad con otros módulos
         st.session_state["df_edit"] = edited.copy()
+        st.session_state["df_contraste_edit"] = edited.copy()
 
         # 4) (Opcional) Construir inputs para Listing con lo EDITADO (Tipo ya correcto)
         st.session_state["inputs_para_listing"] = construir_inputs_listing(

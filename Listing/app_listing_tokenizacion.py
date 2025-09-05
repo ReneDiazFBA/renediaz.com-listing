@@ -267,15 +267,23 @@ def mostrar_clusters_semanticos(excel_data=None):
 # ------------------------------------------------------------
 
 def mostrar_preview_inputs_listing():
+    from mercado.loader_inputs_listing import construir_inputs_listing
 
-    st.subheader("Inputs (espejo 1:1 de Mercado → Tabla final)")
+    st.subheader("Inputs unificados para generación de Listing")
 
-    # 👉 Leemos EXACTAMENTE la misma tabla que ya ves perfecta en Mercado
-    df = st.session_state.get("inputs_para_listing", pd.DataFrame())
+    # 👇 aquí forzamos a usar siempre la última edición de contraste
+    df_edit = st.session_state.get("df_contraste_edit",
+                                   st.session_state.get("df_edit",
+                                                        st.session_state.get("df_edit_atributos", pd.DataFrame())))
+
+    df = construir_inputs_listing(
+        st.session_state.get("resultados_mercado", {}),
+        df_edit,
+        st.session_state.get("excel_data")
+    )
 
     if not isinstance(df, pd.DataFrame) or df.empty:
-        st.info("Aún no hay nada que mostrar aquí. Abre primero Mercado → 'Tabla final de inputs para el Listing' para generar la tabla y traerla a sesión.")
+        st.info("No hay datos aún. Ve a Mercado → Cliente, edita contraste y vuelve.")
         return
 
-    # Mostrar sin filtros, sin normalizaciones, sin nada. 1:1.
     st.dataframe(df, use_container_width=True, hide_index=True)
