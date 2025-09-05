@@ -15,6 +15,8 @@ from listing.funcional_listing_tokenizacion import (
 # ------------------------------------------------------------
 # 1) Tokenización base
 # ------------------------------------------------------------
+
+
 def mostrar_listing_tokenizacion(excel_data=None):
     st.subheader("Tokenización de Keywords Estratégicas")
 
@@ -24,7 +26,8 @@ def mostrar_listing_tokenizacion(excel_data=None):
         return
 
     st.caption("Vista previa de tokens generados por término:")
-    st.dataframe(df[["Search Terms", "tokens", "tier"]], use_container_width=True)
+    st.dataframe(df[["Search Terms", "tokens", "tier"]],
+                 use_container_width=True)
 
 
 # ------------------------------------------------------------
@@ -78,7 +81,8 @@ def mostrar_tokens_priorizados(excel_data=None):
     df_tokens.sort_values(["orden", "token"], inplace=True)
 
     st.caption("Tokens únicos priorizados por tier estratégico. Si un token aparece más de una vez, se muestra su frecuencia.")
-    st.dataframe(df_tokens[["token", "frecuencia", "tier_origen"]], use_container_width=True)
+    st.dataframe(
+        df_tokens[["token", "frecuencia", "tier_origen"]], use_container_width=True)
 
 
 # ------------------------------------------------------------
@@ -196,7 +200,8 @@ def mostrar_embeddings_visualizacion(excel_data=None):
         )
 
     for _, row in df_embed.iterrows():
-        ax.text(row["pca_x"] + 0.01, row["pca_y"] + 0.01, row["token_lema"], fontsize=8, alpha=0.6)
+        ax.text(row["pca_x"] + 0.01, row["pca_y"] + 0.01,
+                row["token_lema"], fontsize=8, alpha=0.6)
 
     ax.set_title("Tokens Lematizados Embebidos — Proyección PCA")
     ax.set_xlabel("Componente 1")
@@ -243,7 +248,8 @@ def mostrar_clusters_semanticos(excel_data=None):
             color=cmap(cluster_id % 10)
         )
         for _, row in datos.iterrows():
-            ax.text(row["x"] + 0.01, row["y"] + 0.01, row["token_lema"], fontsize=8, alpha=0.5)
+            ax.text(row["x"] + 0.01, row["y"] + 0.01,
+                    row["token_lema"], fontsize=8, alpha=0.5)
 
     ax.set_title("Clusters Semánticos de Tokens")
     ax.set_xlabel("PCA 1")
@@ -260,65 +266,96 @@ def mostrar_clusters_semanticos(excel_data=None):
 # ------------------------------------------------------------
 # 6) VISTA PREVIA — lee DIRECTO la tabla final de Mercado
 # ------------------------------------------------------------
+# ------------------------------------------------------------
+# 6) VISTA PREVIA — lee DIRECTO la tabla final de Mercado
+# ------------------------------------------------------------
 def mostrar_preview_inputs_listing():
+    import pandas as pd
+    import unicodedata
+    import streamlit as st
+
     st.subheader("Inputs enriquecidos para generación de listing")
 
-    # 1) Traer la tabla FINAL hecha en Mercado
+    # 1) Intentar leer la tabla final desde sesión
     df = st.session_state.get("inputs_para_listing", pd.DataFrame())
-    if not isinstance(df, pd.DataFrame) or df.empty:
+
+    # Fallback (opcional) por si alguien abre Listing sin pasar por Mercado:
+    if (not isinstance(df, pd.DataFrame)) or df.empty:
+        try:
+            from mercado.loader_inputs_listing import construir_inputs_listing
+            resultados = st.session_state.get("resultados_mercado", {})
+            # df_edit puede haber quedado guardado como "df_edit" o "df_edit_atributos"
+            df_edit = st.session_state.get("df_edit_atributos",
+                                           st.session_state.get("df_edit", pd.DataFrame()))
+            df = construir_inputs_listing(resultados, df_edit, excel_data=None)
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                st.session_state["inputs_para_listing"] = df.copy()
+        except Exception:
+            pass
+
+    if (not isinstance(df, pd.DataFrame)) or df.empty:
         st.info("Aún no hay inputs. Abre Mercado → 'Contraste con Cliente' o 'Tabla Final de Inputs' para generarlos.")
         return
 
     # 2) Conteo por Tipo (diagnóstico)
-    tipo_col = "Tipo" if "Tipo" in df.columns else None
-    if tipo_col:
-        counts = df[tipo_col].astype(str).str.strip().value_counts().reset_index()
+    if "Tipo" in df.columns:
+        counts = df["Tipo"].astype(
+            str).str.strip().value_counts().reset_index()
         counts.columns = ["Tipo", "Cantidad"]
         st.caption("Conteo por Tipo")
         st.dataframe(counts, use_container_width=True, hide_index=True)
 
-    # 3) Normalización para localizar Marca / Atributo / Variación
+    # 3) Normalizar 'Tipo' para buscar Marca / Atributo / Variación sin problemas de acentos
     def _norm_series(s: pd.Series) -> pd.Series:
-        try:
-            import unicodedata
-            s = s.astype(str).str.strip()
-            s = s.apply(lambda x: ''.join(c for c in unicodedata.normalize('NFKD', x) if not unicodedata.combining(c)))
-            return s.str.lower()
-        except Exception:
-            return s.astype(str).str.strip().str.lower()
+        s = s.astype(str).str.strip()
+        return s.apply(
+            lambda x: ''.join(c for c in unicodedata.normalize('NFKD', x)
+                              if not unicodedata.combining(c))
+        ).str.lower()
 
-    tipo_norm = _norm_series(df["Tipo"]) if "Tipo" in df.columns else pd.Series([], dtype=str)
+    tipo_norm = _norm_series(
+        df["Tipo"]) if "Tipo" in df.columns else pd.Series([], dtype=str)
 
+    # 4) Mostrar Marca / Atributos / Variaciones
     col1, col2 = st.columns([1, 2])
 
+    # --- Marca ---
     with col1:
         st.markdown("**Marca**")
         mask_marca = tipo_norm.eq("marca")
-        df_m = df.loc[mask_marca]
-        if not df_m.empty:
-            cols = [c for c in ["Contenido", "Fuente"] if c in df_m.columns]
-            st.dataframe(df_m[cols], use_container_width=True, hide_index=True)
+        df_marca = df.loc[mask_marca]
+        if not df_marca.empty:
+            cols = [c for c in ["Contenido", "Etiqueta",
+                                "Fuente"] if c in df_marca.columns]
+            st.dataframe(df_marca[cols],
+                         use_container_width=True, hide_index=True)
         else:
             st.write("—")
 
+    # --- Atributos ---
+    with col1:
         st.markdown("**Atributos**")
         mask_attr = tipo_norm.eq("atributo")
         df_a = df.loc[mask_attr]
         if not df_a.empty:
-            cols = [c for c in ["Contenido", "Etiqueta", "Fuente"] if c in df_a.columns]
+            cols = [c for c in ["Contenido", "Etiqueta",
+                                "Fuente"] if c in df_a.columns]
             st.dataframe(df_a[cols], use_container_width=True, hide_index=True)
         else:
             st.write("—")
 
+    # --- Variaciones ---
     with col2:
         st.markdown("**Variaciones**")
         mask_var = tipo_norm.eq("variacion")  # captura 'Variación' normalizada
         df_v = df.loc[mask_var]
         if not df_v.empty:
-            cols = [c for c in ["Contenido", "Etiqueta", "Fuente"] if c in df_v.columns]
+            cols = [c for c in ["Contenido", "Etiqueta",
+                                "Fuente"] if c in df_v.columns]
             st.dataframe(df_v[cols], use_container_width=True, hide_index=True)
         else:
             st.write("—")
 
+    # 5) Tabla completa (para auditar)
     with st.expander("Ver tabla completa", expanded=False):
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(df, use_container_width=True, hide_index=True)
