@@ -271,91 +271,61 @@ def mostrar_clusters_semanticos(excel_data=None):
 # ------------------------------------------------------------
 def mostrar_preview_inputs_listing():
     import pandas as pd
-    import unicodedata
     import streamlit as st
+    from mercado.loader_inputs_listing import cargar_inputs_para_listing
 
-    st.subheader("Inputs enriquecidos para generación de listing")
+    st.subheader("Inputs unificados para generación de Listing")
 
-    # 1) Intentar leer la tabla final desde sesión
-    df = st.session_state.get("inputs_para_listing", pd.DataFrame())
+    df = cargar_inputs_para_listing()
 
-    # Fallback (opcional) por si alguien abre Listing sin pasar por Mercado:
-    if (not isinstance(df, pd.DataFrame)) or df.empty:
-        try:
-            from mercado.loader_inputs_listing import construir_inputs_listing
-            resultados = st.session_state.get("resultados_mercado", {})
-            # df_edit puede haber quedado guardado como "df_edit" o "df_edit_atributos"
-            df_edit = st.session_state.get("df_edit_atributos",
-                                           st.session_state.get("df_edit", pd.DataFrame()))
-            df = construir_inputs_listing(resultados, df_edit, excel_data=None)
-            if isinstance(df, pd.DataFrame) and not df.empty:
-                st.session_state["inputs_para_listing"] = df.copy()
-        except Exception:
-            pass
-
-    if (not isinstance(df, pd.DataFrame)) or df.empty:
-        st.info("Aún no hay inputs. Abre Mercado → 'Contraste con Cliente' o 'Tabla Final de Inputs' para generarlos.")
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        st.info("No hay datos aún. Sube tu Excel (CustData) y, si quieres, genera insights en Mercado. "
+                "Esta vista arma la tabla sin depender de 'Tabla final de Mercado'.")
         return
 
-    # 2) Conteo por Tipo (diagnóstico)
+    # Conteo por Tipo (diagnóstico)
     if "Tipo" in df.columns:
-        counts = df["Tipo"].astype(
-            str).str.strip().value_counts().reset_index()
-        counts.columns = ["Tipo", "Cantidad"]
+        counts = (
+            df["Tipo"].astype(str).str.strip()
+            .value_counts().rename_axis("Tipo").reset_index(name="Filas")
+        )
         st.caption("Conteo por Tipo")
         st.dataframe(counts, use_container_width=True, hide_index=True)
 
-    # 3) Normalizar 'Tipo' para buscar Marca / Atributo / Variación sin problemas de acentos
-    def _norm_series(s: pd.Series) -> pd.Series:
-        s = s.astype(str).str.strip()
-        return s.apply(
-            lambda x: ''.join(c for c in unicodedata.normalize('NFKD', x)
-                              if not unicodedata.combining(c))
-        ).str.lower()
-
-    tipo_norm = _norm_series(
-        df["Tipo"]) if "Tipo" in df.columns else pd.Series([], dtype=str)
-
-    # 4) Mostrar Marca / Atributos / Variaciones
-    col1, col2 = st.columns([1, 2])
-
-    # --- Marca ---
-    with col1:
-        st.markdown("**Marca**")
-        mask_marca = tipo_norm.eq("marca")
-        df_marca = df.loc[mask_marca]
-        if not df_marca.empty:
-            cols = [c for c in ["Contenido", "Etiqueta",
-                                "Fuente"] if c in df_marca.columns]
-            st.dataframe(df_marca[cols],
-                         use_container_width=True, hide_index=True)
-        else:
+    # Render por bloques principales (lo que pediste)
+    def _show(title, mask):
+        st.markdown(f"**{title}**")
+        cols = [c for c in ["Contenido", "Etiqueta", "Fuente"] if c in df.columns]
+        sub = df.loc[mask, cols] if cols else df.loc[mask]
+        if sub.empty:
             st.write("—")
-
-    # --- Atributos ---
-    with col1:
-        st.markdown("**Atributos**")
-        mask_attr = tipo_norm.eq("atributo")
-        df_a = df.loc[mask_attr]
-        if not df_a.empty:
-            cols = [c for c in ["Contenido", "Etiqueta",
-                                "Fuente"] if c in df_a.columns]
-            st.dataframe(df_a[cols], use_container_width=True, hide_index=True)
         else:
-            st.write("—")
+            st.dataframe(sub, use_container_width=True, hide_index=True)
 
-    # --- Variaciones ---
-    with col2:
-        st.markdown("**Variaciones**")
-        mask_var = tipo_norm.eq("variacion")  # captura 'Variación' normalizada
-        df_v = df.loc[mask_var]
-        if not df_v.empty:
-            cols = [c for c in ["Contenido", "Etiqueta",
-                                "Fuente"] if c in df_v.columns]
-            st.dataframe(df_v[cols], use_container_width=True, hide_index=True)
-        else:
-            st.write("—")
+    tipo = df["Tipo"].astype(str).str.strip().str.lower(
+    ) if "Tipo" in df.columns else pd.Series([], dtype=str)
+    c1, c2 = st.columns(2)
 
-    # 5) Tabla completa (para auditar)
+    with c1:
+        _show("Marca", tipo.eq("marca"))
+        _show("Descripción breve", tipo.eq("descripción breve"))
+        _show("Beneficios valorados", tipo.eq("beneficio"))
+        _show("Buyer persona", tipo.eq("buyer persona"))
+        _show("Pros", tipo.eq("pro"))
+        _show("Emociones positivas", tipo.eq("emoción positiva"))
+        _show("Tokens diferenciadores (+)", tipo.eq("token diferenciador (+)"))
+        _show("Léxico editorial", tipo.eq("léxico editorial"))
+
+    with c2:
+        _show("Cons", tipo.eq("con"))
+        _show("Emociones negativas", tipo.eq("emoción negativa"))
+        _show("Tokens diferenciadores (–)", tipo.eq("token diferenciador (-)"))
+        _show("Atributos (cliente)", tipo.eq("atributo"))
+        _show("Variaciones (cliente)", tipo.eq(
+            "variación") | tipo.eq("variacion"))
+        _show("Recomendaciones visuales", tipo.eq("recomendación visual"))
+        _show("Tokens semánticos (cluster)", tipo.eq("token semántico"))
+        _show("Seeds Core", tipo.eq("seed core"))
+
     with st.expander("Ver tabla completa", expanded=False):
         st.dataframe(df, use_container_width=True, hide_index=True)
