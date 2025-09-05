@@ -48,10 +48,33 @@ def mostrar_listing_semantico(excel_data: Optional[object] = None):
         st.markdown("### Inputs enriquecidos para generación de listing")
 
         from mercado.loader_inputs_listing import construir_inputs_listing
-        resultados = st.session_state.get("resultados_mercado", {})
-        df_edit = st.session_state.get("df_edit_atributos", pd.DataFrame())
 
-        df_final = construir_inputs_listing(resultados, df_edit)
+        resultados = st.session_state.get("resultados_mercado", {})
+
+        # 👉 Elegimos la primera edición de contraste NO vacía.
+        import pandas as pd
+        df_edit = None
+        for k in ("df_contraste_edit", "df_edit", "df_edit_atributos"):
+            _cand = st.session_state.get(k)
+            if isinstance(_cand, pd.DataFrame) and not _cand.empty:
+                df_edit = _cand
+                break
+        # Si no hay edición, dejamos df_edit = None para que el loader haga fallback (texto o fuente interna)
+
+        # Nota: el constructor también lee st.session_state["contraste_texto"] si existe.
+        df_final = construir_inputs_listing(
+            resultados,
+            df_edit,                           # puede ser None (ok)
+            # opcional: pasa excel para 'Marca'
+            st.session_state.get("excel_data")
+        )
+
+        # Diagnóstico de la fuente (opcional)
+        fuente = "Texto de contraste confirmado" if st.session_state.get("contraste_texto") else (
+            "Tabla de contraste" if isinstance(
+                df_edit, pd.DataFrame) else "Fallback automático"
+        )
+        st.caption(f"Fuente de Atributo/Variación: **{fuente}**")
 
         if df_final.empty:
             st.warning("No se pudo construir la tabla final.")
