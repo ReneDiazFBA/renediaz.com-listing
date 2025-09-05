@@ -271,80 +271,16 @@ def mostrar_clusters_semanticos(excel_data=None):
 # ------------------------------------------------------------
 def mostrar_preview_inputs_listing():
     import pandas as pd
-    import unicodedata
     import streamlit as st
-    from mercado.loader_inputs_listing import cargar_inputs_para_listing
 
-    st.subheader("Inputs unificados para generación de Listing")
+    st.subheader("Inputs (espejo 1:1 de Mercado → Tabla final)")
 
-    df = cargar_inputs_para_listing()
+    # 👉 Leemos EXACTAMENTE la misma tabla que ya ves perfecta en Mercado
+    df = st.session_state.get("inputs_para_listing", pd.DataFrame())
 
     if not isinstance(df, pd.DataFrame) or df.empty:
-        st.info(
-            "No hay datos aún. Sube tu Excel (CustData) y, si quieres, genera insights en Mercado. "
-            "Esta vista arma la tabla sin depender de 'Tabla final de Mercado'."
-        )
+        st.info("Aún no hay nada que mostrar aquí. Abre primero Mercado → 'Tabla final de inputs para el Listing' para generar la tabla y traerla a sesión.")
         return
 
-    # --- NORMALIZACIÓN ROBUSTA DE 'Tipo' (evita acentos combinados NFD vs NFC) ---
-    def _norm(s: str) -> str:
-        if not isinstance(s, str):
-            s = "" if pd.isna(s) else str(s)
-        # Pasa a NFKD y remueve diacríticos; luego lowercase/strip
-        s_nfkd = unicodedata.normalize("NFKD", s)
-        s_sin_acentos = "".join(
-            c for c in s_nfkd if not unicodedata.combining(c))
-        return s_sin_acentos.strip().lower()
-
-    if "Tipo" in df.columns:
-        tipo_norm = df["Tipo"].apply(_norm)
-    else:
-        tipo_norm = pd.Series([], dtype=str)
-
-    # Conteo por Tipo (diagnóstico amable — visible para que tú veas qué llega)
-    if "Tipo" in df.columns:
-        counts = (
-            tipo_norm.value_counts()
-            .rename_axis("Tipo (normalizado)")
-            .reset_index(name="Filas")
-        )
-        st.caption("Conteo por Tipo (normalizado — sin acentos)")
-        st.dataframe(counts, use_container_width=True, hide_index=True)
-
-    # Helper para mostrar bloques sin depender de acentos exactos
-    def _show(title, mask):
-        st.markdown(f"**{title}**")
-        cols = [c for c in ["Contenido", "Etiqueta", "Fuente"] if c in df.columns]
-        sub = df.loc[mask, cols] if cols else df.loc[mask]
-        if sub.empty:
-            st.write("—")
-        else:
-            st.dataframe(sub, use_container_width=True, hide_index=True)
-
-    c1, c2 = st.columns(2)
-
-    with c1:
-        _show("Marca", tipo_norm.eq("marca"))
-        _show("Descripción breve", tipo_norm.eq("descripcion breve"))
-        _show("Beneficios valorados", tipo_norm.eq("beneficio"))
-        _show("Buyer persona", tipo_norm.eq("buyer persona"))
-        _show("Pros", tipo_norm.eq("pro"))
-        _show("Emociones positivas", tipo_norm.eq("emocion positiva"))
-        _show("Tokens diferenciadores (+)",
-              tipo_norm.eq("token diferenciador (+)"))
-        _show("Léxico editorial", tipo_norm.eq("lexico editorial"))
-
-    with c2:
-        _show("Cons", tipo_norm.eq("con"))
-        _show("Emociones negativas", tipo_norm.eq("emocion negativa"))
-        _show("Tokens diferenciadores (–)",
-              tipo_norm.eq("token diferenciador (-)"))
-        _show("Atributos (cliente)", tipo_norm.eq("atributo"))
-        _show("Variaciones (cliente)", tipo_norm.eq(
-            "variacion"))  # << sin acento, robusto
-        _show("Recomendaciones visuales", tipo_norm.eq("recomendacion visual"))
-        _show("Tokens semánticos (cluster)", tipo_norm.eq("token semantico"))
-        _show("Seeds Core", tipo_norm.eq("seed core"))
-
-    with st.expander("Ver tabla completa", expanded=False):
-        st.dataframe(df, use_container_width=True, hide_index=True)
+    # Mostrar sin filtros, sin normalizaciones, sin nada. 1:1.
+    st.dataframe(df, use_container_width=True, hide_index=True)
