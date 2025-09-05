@@ -271,6 +271,7 @@ def mostrar_clusters_semanticos(excel_data=None):
 # ------------------------------------------------------------
 def mostrar_preview_inputs_listing():
     import pandas as pd
+    import unicodedata
     import streamlit as st
     from mercado.loader_inputs_listing import cargar_inputs_para_listing
 
@@ -279,20 +280,38 @@ def mostrar_preview_inputs_listing():
     df = cargar_inputs_para_listing()
 
     if not isinstance(df, pd.DataFrame) or df.empty:
-        st.info("No hay datos aún. Sube tu Excel (CustData) y, si quieres, genera insights en Mercado. "
-                "Esta vista arma la tabla sin depender de 'Tabla final de Mercado'.")
+        st.info(
+            "No hay datos aún. Sube tu Excel (CustData) y, si quieres, genera insights en Mercado. "
+            "Esta vista arma la tabla sin depender de 'Tabla final de Mercado'."
+        )
         return
 
-    # Conteo por Tipo (diagnóstico)
+    # --- NORMALIZACIÓN ROBUSTA DE 'Tipo' (evita acentos combinados NFD vs NFC) ---
+    def _norm(s: str) -> str:
+        if not isinstance(s, str):
+            s = "" if pd.isna(s) else str(s)
+        # Pasa a NFKD y remueve diacríticos; luego lowercase/strip
+        s_nfkd = unicodedata.normalize("NFKD", s)
+        s_sin_acentos = "".join(
+            c for c in s_nfkd if not unicodedata.combining(c))
+        return s_sin_acentos.strip().lower()
+
+    if "Tipo" in df.columns:
+        tipo_norm = df["Tipo"].apply(_norm)
+    else:
+        tipo_norm = pd.Series([], dtype=str)
+
+    # Conteo por Tipo (diagnóstico amable — visible para que tú veas qué llega)
     if "Tipo" in df.columns:
         counts = (
-            df["Tipo"].astype(str).str.strip()
-            .value_counts().rename_axis("Tipo").reset_index(name="Filas")
+            tipo_norm.value_counts()
+            .rename_axis("Tipo (normalizado)")
+            .reset_index(name="Filas")
         )
-        st.caption("Conteo por Tipo")
+        st.caption("Conteo por Tipo (normalizado — sin acentos)")
         st.dataframe(counts, use_container_width=True, hide_index=True)
 
-    # Render por bloques principales (lo que pediste)
+    # Helper para mostrar bloques sin depender de acentos exactos
     def _show(title, mask):
         st.markdown(f"**{title}**")
         cols = [c for c in ["Contenido", "Etiqueta", "Fuente"] if c in df.columns]
@@ -302,30 +321,30 @@ def mostrar_preview_inputs_listing():
         else:
             st.dataframe(sub, use_container_width=True, hide_index=True)
 
-    tipo = df["Tipo"].astype(str).str.strip().str.lower(
-    ) if "Tipo" in df.columns else pd.Series([], dtype=str)
     c1, c2 = st.columns(2)
 
     with c1:
-        _show("Marca", tipo.eq("marca"))
-        _show("Descripción breve", tipo.eq("descripción breve"))
-        _show("Beneficios valorados", tipo.eq("beneficio"))
-        _show("Buyer persona", tipo.eq("buyer persona"))
-        _show("Pros", tipo.eq("pro"))
-        _show("Emociones positivas", tipo.eq("emoción positiva"))
-        _show("Tokens diferenciadores (+)", tipo.eq("token diferenciador (+)"))
-        _show("Léxico editorial", tipo.eq("léxico editorial"))
+        _show("Marca", tipo_norm.eq("marca"))
+        _show("Descripción breve", tipo_norm.eq("descripcion breve"))
+        _show("Beneficios valorados", tipo_norm.eq("beneficio"))
+        _show("Buyer persona", tipo_norm.eq("buyer persona"))
+        _show("Pros", tipo_norm.eq("pro"))
+        _show("Emociones positivas", tipo_norm.eq("emocion positiva"))
+        _show("Tokens diferenciadores (+)",
+              tipo_norm.eq("token diferenciador (+)"))
+        _show("Léxico editorial", tipo_norm.eq("lexico editorial"))
 
     with c2:
-        _show("Cons", tipo.eq("con"))
-        _show("Emociones negativas", tipo.eq("emoción negativa"))
-        _show("Tokens diferenciadores (–)", tipo.eq("token diferenciador (-)"))
-        _show("Atributos (cliente)", tipo.eq("atributo"))
-        _show("Variaciones (cliente)", tipo.eq(
-            "variación") | tipo.eq("variacion"))
-        _show("Recomendaciones visuales", tipo.eq("recomendación visual"))
-        _show("Tokens semánticos (cluster)", tipo.eq("token semántico"))
-        _show("Seeds Core", tipo.eq("seed core"))
+        _show("Cons", tipo_norm.eq("con"))
+        _show("Emociones negativas", tipo_norm.eq("emocion negativa"))
+        _show("Tokens diferenciadores (–)",
+              tipo_norm.eq("token diferenciador (-)"))
+        _show("Atributos (cliente)", tipo_norm.eq("atributo"))
+        _show("Variaciones (cliente)", tipo_norm.eq(
+            "variacion"))  # << sin acento, robusto
+        _show("Recomendaciones visuales", tipo_norm.eq("recomendacion visual"))
+        _show("Tokens semánticos (cluster)", tipo_norm.eq("token semantico"))
+        _show("Seeds Core", tipo_norm.eq("seed core"))
 
     with st.expander("Ver tabla completa", expanded=False):
         st.dataframe(df, use_container_width=True, hide_index=True)
