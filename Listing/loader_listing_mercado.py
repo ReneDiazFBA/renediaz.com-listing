@@ -133,6 +133,11 @@ def construir_inputs_listing(resultados: dict,
         has_tipo = "Tipo" in df_edit.columns
 
         for _, row in df_edit.iterrows():
+            # DEBUG para ver nombres y contenido de columnas
+            st.write("DEBUG row keys:", list(row.index))
+            st.write("DEBUG Atributo Cliente:", row.get(
+                "Atributo Cliente", "NO EXISTE"))
+
             etiqueta_cliente = str(row.get("Atributo Cliente", "")).strip()
             if not etiqueta_cliente:
                 continue  # si está vacío, no generamos fila
