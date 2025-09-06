@@ -1,6 +1,6 @@
-# mercado/loader_inputs_listing.py — v3.7
-# Marca: SOLO CustData!B12, leída directamente de st.session_state["excel_data"]["CustData"]
-# Core tokens: SOLO desde st.session_state["df_lemas_cluster"] (tier_origen~"core")
+# mercado/loader_inputs_listing.py — v3.8
+# Marca: CustData!E12
+# Core tokens: SOLO desde st.session_state["df_lemas_cluster"]
 # Sin "Nombre sugerido". Formato Atributo/Variación intacto.
 
 import streamlit as st
@@ -9,7 +9,7 @@ import re
 import unicodedata
 from typing import Dict, List, Optional, Tuple, Any
 
-VERSION_TAG = "loader_inputs_listing v3.7"
+VERSION_TAG = "loader_inputs_listing v3.8"
 
 # ----------------------------
 # Helpers
@@ -84,29 +84,25 @@ def _split_tokens_pos_neg(text: str) -> Tuple[List[str], List[str]]:
     return pos, neg
 
 # ----------------------------
-# Marca: SOLO CustData!B12 desde session_state (sin parámetros)
+# Marca: CustData!E12 desde session_state
 # ----------------------------
 
 
-def _get_brand_b12_from_session() -> str:
+def _get_brand_e12() -> str:
     """
-    Lee exclusivamente CustData!B12 (fila 11, col 1, base 0) desde st.session_state["excel_data"]["CustData"].
-    No hay escaneos ni fallbacks. Si no existe, retorna "".
+    Lee exclusivamente CustData!E12 (fila 11, col 4, base 0) desde st.session_state["excel_data"]["CustData"].
     """
     try:
         excel_data = st.session_state.get("excel_data")
         if not isinstance(excel_data, dict):
             return ""
-        # Acepta claves con diferentes capitalizaciones: CustData / custdata
-        sheet_keys = [k for k in excel_data.keys() if _norm(k) == "custdata"]
-        if not sheet_keys:
+        if "CustData" not in excel_data:
             return ""
-        df = excel_data[sheet_keys[0]]
+        df = excel_data["CustData"]
         if not isinstance(df, pd.DataFrame):
             return ""
-        # B12 = fila 11, columna 1 (0-based)
-        if df.shape[0] > 11 and df.shape[1] > 1:
-            val = df.iloc[11, 1]
+        if df.shape[0] > 11 and df.shape[1] > 4:
+            val = df.iloc[11, 4]  # E12
             s = "" if pd.isna(val) else str(val).strip()
             if s and _norm(s) not in ("nan", "none", ""):
                 return s
@@ -139,21 +135,18 @@ def construir_inputs_listing(resultados: dict,
     """
     Devuelve DataFrame con columnas: Tipo | Contenido | Etiqueta | Fuente
     Incluye:
-      - Marca (CustData!B12)
+      - Marca (CustData!E12)
       - Reviews (Descripción breve, Beneficios, Buyer, PROS, CONS, Emociones +/- , Léxico, Visuales)
       - Contraste (Etiqueta = valor real de 'Atributo Cliente'; Tipo Atributo/Variación)
       - Tokens (Positive/Negative si vienen en 'resultados')
       - Tokens semánticos (Core por tier_origen~'core'; Cluster si existe 'cluster') DESDE SESIÓN
     """
-    try:
-        st.session_state["loader_inputs_listing_version"] = VERSION_TAG
-    except Exception:
-        pass
+    st.session_state["loader_inputs_listing_version"] = VERSION_TAG
 
     data: List[Dict[str, str]] = []
 
-    # Marca (EXCLUSIVO CustData!B12, desde sesión)
-    marca = _get_brand_b12_from_session()
+    # Marca
+    marca = _get_brand_e12()
     if marca:
         data.append({"Tipo": "Marca", "Contenido": marca,
                     "Etiqueta": "", "Fuente": "Mercado"})
@@ -211,7 +204,7 @@ def construir_inputs_listing(resultados: dict,
                 data.append({"Tipo": "Token", "Contenido": t,
                             "Etiqueta": "Negative", "Fuente": "Reviews"})
 
-    # CONTRASTE (Etiqueta = valor real de 'Atributo Cliente')
+    # CONTRASTE
     if isinstance(df_edit, pd.DataFrame) and not df_edit.empty:
         val_cols = []
         for c in df_edit.columns:
@@ -256,10 +249,9 @@ def construir_inputs_listing(resultados: dict,
                     data.append({"Tipo": "Variación", "Contenido": v,
                                 "Etiqueta": etiqueta_cliente, "Fuente": "Contraste"})
 
-    # Tokens semánticos (Core/Cluster) — SOLO desde sesión
+    # Tokens semánticos (Core/Cluster)
     df_semantic = cargar_lemas_clusters()
     if isinstance(df_semantic, pd.DataFrame) and not df_semantic.empty:
-        # columnas
         norm_cols = {c: _norm(c) for c in df_semantic.columns}
 
         def pick(names: List[str], contains: Optional[str] = None) -> Optional[str]:
@@ -275,29 +267,17 @@ def construir_inputs_listing(resultados: dict,
 
         token_col = pick(["token_lema", "lema", "token", "lemma",
                          "token_normalizado", "keyword"]) or list(df_semantic.columns)[0]
-        tier_col = pick(
-            ["tier_origen", "tier", "tier origen"], contains="tier")
-        cluster_col = pick(["cluster", "cluster_id"], contains="cluster")
-        is_core_col = pick(["is_core"])
-        freq_col = pick(["freq", "frecuencia"], contains="freq")
-        score_col = pick(["score", "puntaje"], contains="score")
+        tier_col = pick(["tier_origen"], contains="tier")
+        cluster_col = pick(["cluster"], contains="cluster")
 
         df_tmp = df_semantic.copy()
         df_tmp[token_col] = df_tmp[token_col].astype(str).str.strip()
         df_tmp = df_tmp[df_tmp[token_col] != ""]
 
-        # CORE: primero tier_origen ~ "core"
         core_df = pd.DataFrame()
         if tier_col:
             core_df = df_tmp[df_tmp[tier_col].astype(
                 str).str.contains(r"\bcore\b", case=False, na=False)]
-        if core_df.empty and is_core_col and (df_tmp[is_core_col] == True).any():
-            core_df = df_tmp[df_tmp[is_core_col] == True]
-        if core_df.empty and freq_col:
-            core_df = df_tmp.sort_values(by=freq_col, ascending=False).head(50)
-        if core_df.empty and score_col:
-            core_df = df_tmp.sort_values(
-                by=score_col, ascending=False).head(50)
         if core_df.empty:
             core_df = df_tmp.drop_duplicates(subset=[token_col]).head(50)
 
@@ -309,7 +289,6 @@ def construir_inputs_listing(resultados: dict,
                 data.append({"Tipo": "Token Semántico (Core)",
                             "Contenido": t, "Etiqueta": "", "Fuente": "SemanticSEO"})
 
-        # CLUSTER (si existe)
         if cluster_col:
             for _, r in df_tmp.iterrows():
                 token = str(r.get(token_col, "")).strip()
