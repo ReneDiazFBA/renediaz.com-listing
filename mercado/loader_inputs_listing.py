@@ -1,5 +1,5 @@
-# mercado/loader_inputs_listing.py — v4.0
-# Marca: CustData!E12 (iloc[11,4]) directo
+# mercado/loader_inputs_listing.py — v3.9
+# Marca: CustData!E12 (iloc[11,4])
 # Tokens semánticos: SOLO desde st.session_state["df_lemas_cluster"]
 
 import streamlit as st
@@ -8,7 +8,7 @@ import re
 import unicodedata
 from typing import Dict, List, Optional, Any
 
-VERSION_TAG = "loader_inputs_listing v4.0"
+VERSION_TAG = "loader_inputs_listing v3.9"
 
 # ----------------------------
 # Helpers
@@ -30,13 +30,18 @@ def _find_col(df: pd.DataFrame, targets: List[str]) -> Optional[str]:
     return None
 
 def _iter_lines(text: Any) -> List[str]:
-    return [linea.strip().strip("-• ").strip()
-            for linea in str(text or "").split("\n") if linea.strip()]
+    out = []
+    for linea in str(text or "").split("\n"):
+        l = linea.strip().strip("-• ").strip()
+        if l:
+            out.append(l)
+    return out
 
 def _split_pros_cons(text: str):
     pros, cons = [], []
     raw = str(text or "")
-    if "PROS:" in raw.upper() or "CONS:" in raw.upper():
+    up = raw.upper()
+    if "PROS:" in up or "CONS:" in up:
         pros_part = re.split(r"CONS\s*:", raw, flags=re.I)[0]
         pros_part = re.split(r"PROS\s*:", pros_part, flags=re.I)[-1]
         cons_part = ""
@@ -62,18 +67,34 @@ def _split_tokens_pos_neg(text: str):
         return pos, neg
     for linea in raw.split("\n"):
         l = linea.strip()
-        if l.startswith("[+]"):
-            pos.append(l.replace("[+]", "").strip())
-        elif l.startswith("[-]"):
-            neg.append(l.replace("[-]", "").strip())
+        if re.match(r"^\s*\[\+\]\s*", l):
+            pos.append(re.sub(r"^\s*\[\+\]\s*", "", l).strip())
+        elif re.match(r"^\s*\[\-\]\s*", l):
+            neg.append(re.sub(r"^\s*\[\-\]\s*", "", l).strip())
     return pos, neg
 
 # ----------------------------
-# Marca: CustData!E12 directo
+# Marca: CustData!E12
 # ----------------------------
 def _get_brand_e12() -> str:
-    # CustData!E12 → fila 11, col 4 (0-based)
-    return str(st.session_state["excel_data"]["CustData"].iloc[11, 4])
+    try:
+        excel_data = st.session_state.get("excel_data")
+        if not isinstance(excel_data, dict):
+            return ""
+        if "CustData" not in excel_data:
+            return ""
+        df = excel_data["CustData"]
+        if not isinstance(df, pd.DataFrame):
+            return ""
+        # E12 = fila 11, col 4 (0-based)
+        if df.shape[0] > 11 and df.shape[1] > 4:
+            val = df.iloc[11, 4]
+            s = "" if pd.isna(val) else str(val).strip()
+            if s and _norm(s) not in ("nan", "none", ""):
+                return s
+    except Exception:
+        return ""
+    return ""
 
 # ----------------------------
 # Tokens semánticos: SOLO desde sesión
@@ -94,99 +115,111 @@ def construir_inputs_listing(resultados: dict,
     st.session_state["loader_inputs_listing_version"] = VERSION_TAG
     data: List[Dict[str, str]] = []
 
-    # Marca (siempre se agrega)
+    # Marca
     marca = _get_brand_e12()
-    data.append({"Tipo": "Marca", "Contenido": marca, "Etiqueta": "", "Fuente": "Mercado"})
+    if marca:
+        data.append({"Tipo": "Marca", "Contenido": marca, "Etiqueta": "", "Fuente": "Mercado"})
 
     # Reviews
     if isinstance(resultados, dict):
         if (descripcion := resultados.get("descripcion")):
-            data.append({"Tipo": "Descripción breve", "Contenido": str(descripcion).strip(),
-                         "Etiqueta": "", "Fuente": "Reviews"})
+            data.append({"Tipo": "Descripción breve", "Contenido": str(descripcion).strip(), "Etiqueta": "", "Fuente": "Reviews"})
         if (persona := resultados.get("buyer_persona")):
-            data.append({"Tipo": "Buyer persona", "Contenido": str(persona).strip(),
-                         "Etiqueta": "", "Fuente": "Reviews"})
+            data.append({"Tipo": "Buyer persona", "Contenido": str(persona).strip(), "Etiqueta": "", "Fuente": "Reviews"})
         for linea in _iter_lines(resultados.get("beneficios", "")):
-            data.append({"Tipo": "Beneficio", "Contenido": linea,
-                         "Etiqueta": "Positivo", "Fuente": "Reviews"})
+            data.append({"Tipo": "Beneficio", "Contenido": linea, "Etiqueta": "Positivo", "Fuente": "Reviews"})
         pros, cons = _split_pros_cons(str(resultados.get("pros_cons", "")))
         for linea in pros:
-            data.append({"Tipo": "Beneficio", "Contenido": linea,
-                         "Etiqueta": "PRO", "Fuente": "Reviews"})
+            data.append({"Tipo": "Beneficio", "Contenido": linea, "Etiqueta": "PRO", "Fuente": "Reviews"})
         for linea in cons:
-            data.append({"Tipo": "Obstáculo", "Contenido": linea,
-                         "Etiqueta": "CON", "Fuente": "Reviews"})
-        for e in _iter_lines(resultados.get("emociones", "")):
-            etiqueta = "positive" if e.startswith("[+]") else "negative" if e.startswith("[-]") else ""
-            e = e.replace("[+]", "").replace("[-]", "").strip()
+            data.append({"Tipo": "Obstáculo", "Contenido": linea, "Etiqueta": "CON", "Fuente": "Reviews"})
+        emos = _iter_lines(resultados.get("emociones", ""))
+        for e in emos:
+            etiqueta = ""
+            if re.match(r"^\s*\[\+\]\s*", e):
+                etiqueta = "positive"
+                e = re.sub(r"^\s*\[\+\]\s*", "", e).strip()
+            elif re.match(r"^\s*\[\-\]\s*", e):
+                etiqueta = "negative"
+                e = re.sub(r"^\s*\[\-\]\s*", "", e).strip()
             data.append({"Tipo": "Emoción", "Contenido": e, "Etiqueta": etiqueta, "Fuente": "Reviews"})
         if (lexico := resultados.get("lexico_editorial")):
-            data.append({"Tipo": "Léxico editorial", "Contenido": str(lexico).strip(),
-                         "Etiqueta": "", "Fuente": "Reviews"})
+            data.append({"Tipo": "Léxico editorial", "Contenido": str(lexico).strip(), "Etiqueta": "", "Fuente": "Reviews"})
         if (visual := resultados.get("visuales")):
-            data.append({"Tipo": "Visual", "Contenido": str(visual).strip(),
-                         "Etiqueta": "", "Fuente": "IA"})
+            data.append({"Tipo": "Visual", "Contenido": str(visual).strip(), "Etiqueta": "", "Fuente": "IA"})
         tokens_raw = resultados.get("tokens", "")
         pos_toks, neg_toks = _split_tokens_pos_neg(tokens_raw)
         for t in pos_toks:
-            data.append({"Tipo": "Token", "Contenido": t,
-                         "Etiqueta": "Positive", "Fuente": "Reviews"})
+            if t:
+                data.append({"Tipo": "Token", "Contenido": t, "Etiqueta": "Positive", "Fuente": "Reviews"})
         for t in neg_toks:
-            data.append({"Tipo": "Token", "Contenido": t,
-                         "Etiqueta": "Negative", "Fuente": "Reviews"})
+            if t:
+                data.append({"Tipo": "Token", "Contenido": t, "Etiqueta": "Negative", "Fuente": "Reviews"})
 
     # Contraste
     if isinstance(df_edit, pd.DataFrame) and not df_edit.empty:
-        val_cols = [c for c in df_edit.columns
-                    if re.search(r"(valor|value)\s*[_\-]?[1-4]", str(c), flags=re.I)]
-        val_cols = sorted(val_cols, key=lambda c: int(re.findall(r"[1-4]", str(c))[0]) if re.findall(r"[1-4]", str(c)) else 9)
+        val_cols = [c for c in df_edit.columns if re.search(r"(valor|value)\s*[_\-]?[1-4]", str(c), flags=re.I)]
+        def _orden_val(cname: str) -> int:
+            m = re.findall(r"[1-4]", str(cname))
+            return int(m[0]) if m else 9
+        val_cols = sorted(val_cols, key=_orden_val)
         attr_col = _find_col(df_edit, ["atributo cliente", "atributo_cliente", "attribute client"])
         has_tipo = _find_col(df_edit, ["tipo"])
         for _, row in df_edit.iterrows():
             etiqueta_cliente = str(row.get(attr_col, "")).strip() if attr_col else ""
             if not etiqueta_cliente:
                 continue
-            values = [str(row.get(c, "")).strip() for c in val_cols if str(row.get(c, "")).strip()]
+            values = []
+            for c in val_cols:
+                v = str(row.get(c, "")).strip()
+                if v and _norm(v) not in ("nan", "none", "-", "—", "n/a", "na", ""):
+                    values.append(v)
             if not values:
                 continue
             if has_tipo:
                 t_raw = str(row.get(has_tipo, "")).strip().lower()
-                tipo = "Variación" if "variac" in t_raw else "Atributo" if "atribut" in t_raw else "Atributo" if len(values) == 1 else "Variación"
+                tipo = "Variación" if "variac" in t_raw else ("Atributo" if "atribut" in t_raw else ("Atributo" if len(values) == 1 else "Variación"))
             else:
                 tipo = "Atributo" if len(values) == 1 else "Variación"
             if tipo == "Atributo" and len(values) == 1:
-                data.append({"Tipo": "Atributo", "Contenido": values[0],
-                             "Etiqueta": etiqueta_cliente, "Fuente": "Contraste"})
+                data.append({"Tipo": "Atributo", "Contenido": values[0], "Etiqueta": etiqueta_cliente, "Fuente": "Contraste"})
             else:
                 for v in values:
-                    data.append({"Tipo": "Variación", "Contenido": v,
-                                 "Etiqueta": etiqueta_cliente, "Fuente": "Contraste"})
+                    data.append({"Tipo": "Variación", "Contenido": v, "Etiqueta": etiqueta_cliente, "Fuente": "Contraste"})
 
     # Tokens semánticos
     df_semantic = cargar_lemas_clusters()
-    if not df_semantic.empty:
+    if isinstance(df_semantic, pd.DataFrame) and not df_semantic.empty:
         token_col = "token_lema" if "token_lema" in df_semantic.columns else df_semantic.columns[0]
         tier_col = "tier_origen" if "tier_origen" in df_semantic.columns else None
         cluster_col = "cluster" if "cluster" in df_semantic.columns else None
         df_tmp = df_semantic.copy()
         df_tmp[token_col] = df_tmp[token_col].astype(str).str.strip()
         df_tmp = df_tmp[df_tmp[token_col] != ""]
-        core_df = df_tmp[df_tmp[tier_col].astype(str).str.contains(r"\bcore\b", case=False, na=False)] if tier_col else pd.DataFrame()
+        core_df = pd.DataFrame()
+        if tier_col:
+            core_df = df_tmp[df_tmp[tier_col].astype(str).str.contains(r"\bcore\b", case=False, na=False)]
         if core_df.empty:
             core_df = df_tmp.drop_duplicates(subset=[token_col]).head(50)
-        for t in core_df[token_col]:
-            data.append({"Tipo": "Token Semántico (Core)", "Contenido": str(t).strip(),
-                         "Etiqueta": "", "Fuente": "SemanticSEO"})
+        seen = set()
+        for t in core_df[token_col].astype(str):
+            t = t.strip()
+            if t and t not in seen:
+                seen.add(t)
+                data.append({"Tipo": "Token Semántico (Core)", "Contenido": t, "Etiqueta": "", "Fuente": "SemanticSEO"})
         if cluster_col:
             for _, r in df_tmp.iterrows():
                 token = str(r.get(token_col, "")).strip()
-                if token:
-                    cl = r.get(cluster_col, "")
-                    data.append({"Tipo": "Token Semántico (Cluster)", "Contenido": token,
-                                 "Etiqueta": f"Cluster {cl}" if str(cl) else "", "Fuente": "SemanticSEO"})
+                if not token:
+                    continue
+                cl = r.get(cluster_col, "")
+                data.append({"Tipo": "Token Semántico (Cluster)", "Contenido": token, "Etiqueta": f"Cluster {cl}" if str(cl) else "", "Fuente": "SemanticSEO"})
 
     df = pd.DataFrame(data, columns=["Tipo", "Contenido", "Etiqueta", "Fuente"])
-    df.reset_index(drop=True, inplace=True)
+    if not df.empty:
+        df.dropna(how="all", inplace=True)
+        df = df[df["Contenido"].astype(str).str.strip() != ""]
+        df.reset_index(drop=True, inplace=True)
     return df
 
 # ----------------------------
@@ -197,3 +230,4 @@ def cargar_inputs_para_listing() -> pd.DataFrame:
     if isinstance(df, pd.DataFrame) and not df.empty:
         return df
     return pd.DataFrame()
+s
