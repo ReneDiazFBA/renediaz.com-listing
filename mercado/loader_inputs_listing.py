@@ -13,8 +13,6 @@ VERSION_TAG = "loader_inputs_listing v4.2"
 # ----------------------------
 # Helpers
 # ----------------------------
-
-
 def _norm(s: Any) -> str:
     if s is None:
         return ""
@@ -24,7 +22,6 @@ def _norm(s: Any) -> str:
     s = re.sub(r"\s+", " ", s.replace("\u00A0", " ")).strip().lower()
     return s
 
-
 def _find_col(df: pd.DataFrame, targets: List[str]) -> Optional[str]:
     tset = {_norm(t) for t in targets}
     for c in df.columns:
@@ -32,11 +29,9 @@ def _find_col(df: pd.DataFrame, targets: List[str]) -> Optional[str]:
             return c
     return None
 
-
 def _iter_lines(text: Any) -> List[str]:
     return [linea.strip().strip("-• ").strip()
             for linea in str(text or "").split("\n") if linea.strip()]
-
 
 def _split_pros_cons(text: str):
     pros, cons = [], []
@@ -51,7 +46,6 @@ def _split_pros_cons(text: str):
         pros = _iter_lines(pros_part)
         cons = _iter_lines(cons_part)
     return pros, cons
-
 
 def _split_tokens_pos_neg(text: str):
     pos, neg = [], []
@@ -68,7 +62,6 @@ def _split_tokens_pos_neg(text: str):
 # Marca: CustData!E12 directo
 # ----------------------------
 # ------- reemplaza TODO este bloque en tu loader -------
-
 
 def _get_brand_e12_y_debug():
     """
@@ -115,7 +108,6 @@ def _get_brand_e12_y_debug():
 
     return "ERROR_FMT(excel_data)", " | ".join(dbg_parts)
 
-
 def construir_inputs_listing(resultados: dict,
                              df_edit: pd.DataFrame,
                              excel_data: object = None) -> pd.DataFrame:
@@ -123,20 +115,17 @@ def construir_inputs_listing(resultados: dict,
 
     # 1) SIEMPRE: trae Marca y un DEBUG visible para saber QUÉ se leyó
     marca_val, marca_dbg = _get_brand_e12_y_debug()
-    data.append({"Tipo": "Marca", "Contenido": str(
-        marca_val), "Etiqueta": "", "Fuente": "Mercado"})
+    data.append({"Tipo": "Marca", "Contenido": str(marca_val), "Etiqueta": "", "Fuente": "Mercado"})
     # (Déjalo mientras verificas; cuando veas la marca, puedes borrar esta línea DEBUG)
-    data.append({"Tipo": "DEBUG", "Contenido": marca_dbg,
-                "Etiqueta": "", "Fuente": "CustData!E12"})
+    data.append({"Tipo": "DEBUG", "Contenido": marca_dbg, "Etiqueta": "", "Fuente": "CustData!E12"})
 
     # ------- deja el resto de tu lógica (reviews/contraste/tokens) tal y como la tienes -------
     # ... (todo lo demás igual) ...
 
-    df = pd.DataFrame(
-        data, columns=["Tipo", "Contenido", "Etiqueta", "Fuente"])
+    df = pd.DataFrame(data, columns=["Tipo", "Contenido", "Etiqueta", "Fuente"])
     df.reset_index(drop=True, inplace=True)
     return df
-# ------- fin del bloque a reemplazar -------
+# ------- fin del bloque a reemplazar ------- 
 
 
 # ----------------------------
@@ -151,8 +140,6 @@ def cargar_lemas_clusters() -> pd.DataFrame:
 # ----------------------------
 # Constructor principal
 # ----------------------------
-
-
 def construir_inputs_listing(resultados: dict,
                              df_edit: pd.DataFrame,
                              excel_data: object = None) -> pd.DataFrame:
@@ -162,8 +149,7 @@ def construir_inputs_listing(resultados: dict,
 
     # --- Marca (siempre) ---
     marca = _get_brand_e12()
-    data.append({"Tipo": "Marca", "Contenido": marca,
-                "Etiqueta": "", "Fuente": "Mercado"})
+    data.append({"Tipo": "Marca", "Contenido": marca, "Etiqueta": "", "Fuente": "Mercado"})
 
     # --- Reviews ---
     if isinstance(resultados, dict):
@@ -184,11 +170,9 @@ def construir_inputs_listing(resultados: dict,
             data.append({"Tipo": "Obstáculo", "Contenido": linea,
                          "Etiqueta": "CON", "Fuente": "Reviews"})
         for e in _iter_lines(resultados.get("emociones", "")):
-            etiqueta = "positive" if e.startswith(
-                "[+]") else "negative" if e.startswith("[-]") else ""
+            etiqueta = "positive" if e.startswith("[+]") else "negative" if e.startswith("[-]") else ""
             e = e.replace("[+]", "").replace("[-]", "").strip()
-            data.append({"Tipo": "Emoción", "Contenido": e,
-                        "Etiqueta": etiqueta, "Fuente": "Reviews"})
+            data.append({"Tipo": "Emoción", "Contenido": e, "Etiqueta": etiqueta, "Fuente": "Reviews"})
         if (lexico := resultados.get("lexico_editorial")):
             data.append({"Tipo": "Léxico editorial", "Contenido": str(lexico).strip(),
                          "Etiqueta": "", "Fuente": "Reviews"})
@@ -208,24 +192,19 @@ def construir_inputs_listing(resultados: dict,
     if isinstance(df_edit, pd.DataFrame) and not df_edit.empty:
         val_cols = [c for c in df_edit.columns
                     if re.search(r"(valor|value)\s*[_\-]?[1-4]", str(c), flags=re.I)]
-        val_cols = sorted(val_cols, key=lambda c: int(re.findall(
-            r"[1-4]", str(c))[0]) if re.findall(r"[1-4]", str(c)) else 9)
-        attr_col = _find_col(
-            df_edit, ["atributo cliente", "atributo_cliente", "attribute client"])
+        val_cols = sorted(val_cols, key=lambda c: int(re.findall(r"[1-4]", str(c))[0]) if re.findall(r"[1-4]", str(c)) else 9)
+        attr_col = _find_col(df_edit, ["atributo cliente", "atributo_cliente", "attribute client"])
         has_tipo = _find_col(df_edit, ["tipo"])
         for _, row in df_edit.iterrows():
-            etiqueta_cliente = str(row.get(attr_col, "")
-                                   ).strip() if attr_col else ""
+            etiqueta_cliente = str(row.get(attr_col, "")).strip() if attr_col else ""
             if not etiqueta_cliente:
                 continue
-            values = [str(row.get(c, "")).strip()
-                      for c in val_cols if str(row.get(c, "")).strip()]
+            values = [str(row.get(c, "")).strip() for c in val_cols if str(row.get(c, "")).strip()]
             if not values:
                 continue
             if has_tipo:
                 t_raw = str(row.get(has_tipo, "")).strip().lower()
-                tipo = "Variación" if "variac" in t_raw else "Atributo" if "atribut" in t_raw else "Atributo" if len(
-                    values) == 1 else "Variación"
+                tipo = "Variación" if "variac" in t_raw else "Atributo" if "atribut" in t_raw else "Atributo" if len(values) == 1 else "Variación"
             else:
                 tipo = "Atributo" if len(values) == 1 else "Variación"
             if tipo == "Atributo" and len(values) == 1:
@@ -239,15 +218,13 @@ def construir_inputs_listing(resultados: dict,
     # --- Tokens semánticos ---
     df_semantic = cargar_lemas_clusters()
     if not df_semantic.empty:
-        token_col = "token_lema" if "token_lema" in df_semantic.columns else df_semantic.columns[
-            0]
+        token_col = "token_lema" if "token_lema" in df_semantic.columns else df_semantic.columns[0]
         tier_col = "tier_origen" if "tier_origen" in df_semantic.columns else None
         cluster_col = "cluster" if "cluster" in df_semantic.columns else None
         df_tmp = df_semantic.copy()
         df_tmp[token_col] = df_tmp[token_col].astype(str).str.strip()
         df_tmp = df_tmp[df_tmp[token_col] != ""]
-        core_df = df_tmp[df_tmp[tier_col].astype(str).str.contains(
-            r"\bcore\b", case=False, na=False)] if tier_col else pd.DataFrame()
+        core_df = df_tmp[df_tmp[tier_col].astype(str).str.contains(r"\bcore\b", case=False, na=False)] if tier_col else pd.DataFrame()
         if core_df.empty:
             core_df = df_tmp.drop_duplicates(subset=[token_col]).head(50)
         for t in core_df[token_col]:
@@ -262,16 +239,13 @@ def construir_inputs_listing(resultados: dict,
                                  "Etiqueta": f"Cluster {cl}" if str(cl) else "", "Fuente": "SemanticSEO"})
 
     # --- Devolver siempre algo ---
-    df = pd.DataFrame(
-        data, columns=["Tipo", "Contenido", "Etiqueta", "Fuente"])
+    df = pd.DataFrame(data, columns=["Tipo", "Contenido", "Etiqueta", "Fuente"])
     df.reset_index(drop=True, inplace=True)
     return df
 
 # ----------------------------
 # Compat
 # ----------------------------
-
-
 def cargar_inputs_para_listing() -> pd.DataFrame:
     df = st.session_state.get("inputs_para_listing", None)
     if isinstance(df, pd.DataFrame) and not df.empty:
