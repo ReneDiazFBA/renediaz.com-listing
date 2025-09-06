@@ -3,6 +3,9 @@
 # Generates EN copy in RD ranges. Backend 243–249 BYTES without spaces, with typos/other languages, no duplication with surface copy.
 # Python 3.9 compatible.
 
+from __future__ import annotations
+from listing.funcional_listing_datos import get_insumos_copywrite
+from typing import Dict, List
 from typing import Any, Dict, List, Optional, Tuple, Union
 import os
 import re
@@ -427,3 +430,147 @@ def lafuncionqueejecuta_listing_copywrite(
         "search_terms": backend,
     }
     return lafuncionqueejecuta_listing_sanitizer_en(draft)
+# listing/funcional_listing_copywrite.py
+# Orquesta la generación del copy: llama a funcional_listing_datos
+# para extraer insumos desde inputs_para_listing y construye el prompt.
+# Si hay OPENAI_API_KEY, usa IA; si no, usa un fallback local.
+
+
+# ─────────────────────────────────────────────────────────────
+# Fallback local (barato) por si no hay API: produce un JSON válido
+# ─────────────────────────────────────────────────────────────
+def _fallback_local_draft(ins: Dict) -> Dict:
+    brand = (ins.get("brand") or "").strip()
+    attrs = ins.get("attributes", [])[:3]
+    vars_ = ins.get("variations", [])[:1]
+    cores = ins.get("core_tokens", [])[:3]
+    bens = ins.get("benefits", [])[:5]
+    persona = ins.get("buyer_persona", "")
+    desc = ins.get("description_short", "")
+
+    # Title heurístico (≈150–180 chars cuando hay material)
+    what = " ".join(cores) if cores else desc[:60]
+    parts = []
+    if brand:
+        parts.append(brand)
+    if what:
+        parts.append(what)
+    if attrs:
+        parts.append(", ".join(attrs))
+    if vars_:
+        parts.append(vars_[0])
+    title = " - ".join([parts[0], " - ".join(parts[1:])]
+                       ) if len(parts) > 1 else (parts[0] if parts else "")
+
+    # Bullets sencillos (5)
+    def _cap(s: str) -> str:
+        return s.upper().replace(":", "").strip()
+
+    bullets: List[str] = []
+    if bens:
+        for b in bens[:5]:
+            bullets.append(f"{_cap('benefit')}: {b}")
+    while len(bullets) < 5:
+        bullets.append(
+            "FEATURE: Detail about a useful attribute and the benefit in a clear, compliant sentence.")
+
+    # Description breve (no 1600–2000, solo para fallback)
+    description = desc or "Concise product summary. Explain what it is, who it is for, and why it helps."
+
+    # Backend básico (no garantizamos bytes sin espacios, solo placeholder)
+    backend = " ".join(cores[:8] + attrs[:8])
+
+    return {
+        "title": title[:200],
+        "bullets": bullets[:5],
+        "description": description,
+        "search_terms": backend,
+    }
+
+
+# ─────────────────────────────────────────────────────────────
+# IA: genera borrador con modelo económico si hay API
+# ─────────────────────────────────────────────────────────────
+def _ai_generate_draft(ins: Dict, cost_saver: bool = True) -> Dict:
+    # Preparar inputs para el prompt
+    head_phrases = ins.get("head_phrases", [])
+    core_tokens = ins.get("core_tokens", [])
+    attributes = ins.get("attributes", [])
+    variations = ins.get("variations", [])
+    benefits = ins.get("benefits", [])
+    emotions = ins.get("emotions", [])
+    buyer_persona = ins.get("buyer_persona", "")
+    lexico = ins.get("lexico", "")
+
+    # Recortes para ahorrar costo
+    if cost_saver:
+        head_phrases = head_phrases[:8]
+        core_tokens = core_tokens[:30]
+        attributes = attributes[:12]
+        variations = variations[:12]
+        benefits = benefits[:12]
+        emotions = emotions[:12]
+
+    prompt = prompt_master_json(
+        head_phrases=head_phrases,
+        core_tokens=core_tokens,
+        attributes=attributes,
+        variations=variations,
+        benefits=benefits,
+        emotions=emotions,
+        buyer_persona=buyer_persona,
+        lexico=lexico,
+    )
+
+    # Si no hay API key, usar fallback
+    api_key = os.getenv("OPENAI_API_KEY", "") or ""
+    if not api_key:
+        return _fallback_local_draft(ins)
+
+    # Cliente OpenAI (v. nueva)
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key)
+
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            temperature=0.2,
+            messages=[
+                {"role": "system", "content": "You are an expert Amazon listing copywriter. Return ONLY valid JSON."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        txt = resp.choices[0].message.content.strip()
+        # Intenta parsear JSON
+        draft = json.loads(txt)
+        # Validación mínima
+        for k in ("title", "bullets", "description", "search_terms"):
+            draft.setdefault(k, "" if k != "bullets" else [])
+        return draft
+    except Exception:
+        # Ante cualquier error de red/formato, devolvemos fallback local
+        return _fallback_local_draft(ins)
+
+
+# ─────────────────────────────────────────────────────────────
+# ENTRYPOINT público que usa la App
+# ─────────────────────────────────────────────────────────────
+def lafuncionqueejecuta_listing_copywrite(
+    inputs_df: pd.DataFrame,
+    use_ai: bool = True,
+    cost_saver: bool = True,
+) -> Dict:
+    """
+    - Lee insumos desde el DF maestro (inputs_para_listing) vía funcional_listing_datos.
+    - Si use_ai y hay OPENAI_API_KEY → IA.
+    - Si no → fallback local.
+    """
+    if not isinstance(inputs_df, pd.DataFrame) or inputs_df.empty:
+        return {"title": "", "bullets": [], "description": "", "search_terms": ""}
+
+    ins = get_insumos_copywrite(inputs_df)
+
+    if use_ai:
+        return _ai_generate_draft(ins, cost_saver=cost_saver)
+    else:
+        return _fallback_local_draft(ins)
