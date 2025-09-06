@@ -85,8 +85,24 @@ def _split_tokens_pos_neg(text: str):
 
 
 def _get_brand_e12() -> str:
-    # CustData!E12 → fila 11, col 4 (0-based)
-    return str(st.session_state["excel_data"]["CustData"].iloc[11, 4])
+    try:
+        excel_data = st.session_state.get("excel_data")
+        if not isinstance(excel_data, dict):
+            return ""
+        if "CustData" not in excel_data:
+            return ""
+        df = excel_data["CustData"]
+        if not isinstance(df, pd.DataFrame):
+            return ""
+        # E12 = fila 11, col 4 (0-based)
+        if df.shape[0] > 11 and df.shape[1] > 4:
+            val = df.iloc[11, 4]
+            s = "" if pd.isna(val) else str(val).strip()
+            if s and _norm(s) not in ("nan", "none", ""):
+                return s
+    except Exception:
+        return ""
+    return ""
 
 # ----------------------------
 # Tokens semánticos: SOLO desde sesión
