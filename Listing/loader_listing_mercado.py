@@ -1,11 +1,14 @@
 # mercado/loader_inputs_listing.py
-
 import streamlit as st
 import pandas as pd
 import re
+import unicodedata
 from typing import Dict, List, Optional, Tuple
 
 
+# ─────────────────────────────────────────────────────────
+# Helpers generales
+# ─────────────────────────────────────────────────────────
 def cargar_lemas_clusters() -> pd.DataFrame:
     """
     Devuelve la tabla de lemas/cluster desde sesión si existe.
@@ -16,12 +19,44 @@ def cargar_lemas_clusters() -> pd.DataFrame:
     return pd.DataFrame()
 
 
+def _norm_txt(s: str) -> str:
+    """Normaliza texto: quita acentos/combining, baja a lower y colapsa espacios."""
+    if not isinstance(s, str):
+        s = "" if s is None else str(s)
+    s = "".join(c for c in unicodedata.normalize(
+        "NFKD", s) if not unicodedata.combining(c))
+    s = re.sub(r"\s+", " ", s.strip().lower())
+    return s
+
+
+def _find_col_atributo_cliente(df: pd.DataFrame) -> Optional[str]:
+    """
+    Localiza la columna 'Atributo Cliente' de forma tolerante.
+    Acepta variantes con/ sin acentos, espacios o guiones/underscores.
+    """
+    objetivos = {"atributo cliente", "atributo_cliente", "atributocliente"}
+    for c in df.columns:
+        n1 = _norm_txt(c)
+        n2 = n1.replace("_", " ")
+        n3 = n1.replace("_", "")
+        if n1 in objetivos or n2 in objetivos or n3 in objetivos:
+            return c
+        # también acepta encabezados que empiecen por 'atributo cliente'
+        if n2.startswith("atributo cliente"):
+            return c
+    return None
+
+
+# ─────────────────────────────────────────────────────────
+# Constructor de la tabla final
+# ─────────────────────────────────────────────────────────
 def construir_inputs_listing(resultados: dict,
                              df_edit: pd.DataFrame,
                              excel_data: object = None) -> pd.DataFrame:
     """
     Construye la tabla final con Reviews + Contraste + Semántico.
-    En Contraste, la columna Etiqueta toma el valor de "Atributo Cliente".
+    En Contraste, la columna Etiqueta toma el VALOR REAL de 'Atributo Cliente'.
+    Si la celda de 'Atributo Cliente' está vacía, NO se emite fila.
     """
     data = []
 
@@ -116,13 +151,16 @@ def construir_inputs_listing(resultados: dict,
             })
 
     # ------------------------------
-    # CONTRASTE
+    # CONTRASTE (Etiqueta = valor exacto de 'Atributo Cliente')
     # ------------------------------
     if df_edit is not None and isinstance(df_edit, pd.DataFrame) and not df_edit.empty:
-        # detectar columnas Valor 1..4
+        # localizar columna 'Atributo Cliente' robustamente
+        col_attr_cliente = _find_col_atributo_cliente(df_edit)
+
+        # detectar columnas Valor 1..4 de forma tolerante
         val_cols = []
         for c in df_edit.columns:
-            if re.search(r"(?:^|[^A-Za-z])(valor|value)\s*[_\-]?\s*([1-4])", str(c), flags=re.I):
+            if re.search(r"(?:^|[^A-Za-z])(valor|value)\s*[_\-]?\s*([1-4])(?:[^0-9]|$)", str(c), flags=re.I):
                 val_cols.append(c)
 
         def _orden_val(cname: str) -> int:
@@ -133,16 +171,16 @@ def construir_inputs_listing(resultados: dict,
         has_tipo = "Tipo" in df_edit.columns
 
         for _, row in df_edit.iterrows():
-            # DEBUG para ver nombres y contenido de columnas
-            st.write("DEBUG row keys:", list(row.index))
-            st.write("DEBUG Atributo Cliente:", row.get(
-                "Atributo Cliente", "NO EXISTE"))
+            # si no encontramos la columna, no emitimos filas de contraste
+            if not col_attr_cliente:
+                continue
 
-            etiqueta_cliente = str(row.get("Atributo Cliente", "")).strip()
+            etiqueta_cliente = str(row.get(col_attr_cliente, "")).strip()
             if not etiqueta_cliente:
-                continue  # si está vacío, no generamos fila
+                # sin etiqueta de cliente, no generamos filas
+                continue
 
-            # valores
+            # valores (Valor 1..4) no vacíos
             values = []
             for c in val_cols:
                 v = str(row.get(c, "")).strip()
@@ -152,10 +190,10 @@ def construir_inputs_listing(resultados: dict,
             if not values:
                 continue
 
-            # tipo
+            # tipo (preferir columna 'Tipo' si existe)
             if has_tipo:
                 t_raw = str(row.get("Tipo", "")).strip().lower()
-                if "variac" in t_raw:
+                if "variac" in t_raw:   # variación/variacion
                     tipo = "Variación"
                 elif "atribut" in t_raw:
                     tipo = "Atributo"
@@ -164,12 +202,12 @@ def construir_inputs_listing(resultados: dict,
             else:
                 tipo = "Atributo" if len(values) == 1 else "Variación"
 
-            # generar filas
+            # emitir filas
             if tipo == "Atributo" and len(values) == 1:
                 data.append({
                     "Tipo": "Atributo",
                     "Contenido": values[0],
-                    "Etiqueta": etiqueta_cliente,
+                    "Etiqueta": etiqueta_cliente,   # ← valor REAL
                     "Fuente": "Contraste"
                 })
             else:
@@ -177,12 +215,12 @@ def construir_inputs_listing(resultados: dict,
                     data.append({
                         "Tipo": "Variación",
                         "Contenido": v,
-                        "Etiqueta": etiqueta_cliente,
+                        "Etiqueta": etiqueta_cliente,  # ← valor REAL
                         "Fuente": "Contraste"
                     })
 
     # ------------------------------
-    # Tokens semánticos
+    # Tokens semánticos (clusters)
     # ------------------------------
     df_semantic = cargar_lemas_clusters()
     if not df_semantic.empty:
@@ -201,14 +239,16 @@ def construir_inputs_listing(resultados: dict,
 
     df = pd.DataFrame(data)
     if not df.empty:
+        df.drop_duplicates(subset=[
+                           "Tipo", "Contenido", "Etiqueta", "Fuente"], inplace=True, ignore_index=True)
         df.dropna(how="all", inplace=True)
     return df
 
 
+# ─────────────────────────────────────────────────────────
+# Compat: carga desde sesión si ya existe
+# ─────────────────────────────────────────────────────────
 def cargar_inputs_para_listing() -> pd.DataFrame:
-    """
-    Retorna la tabla final construida si existe en sesión.
-    """
     df = st.session_state.get("inputs_para_listing", None)
     if isinstance(df, pd.DataFrame) and not df.empty:
         return df
