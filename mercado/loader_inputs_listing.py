@@ -170,28 +170,43 @@ def construir_inputs_listing(resultados: dict,
             data.append({"Tipo": "Obstáculo", "Contenido": linea,
                          "Etiqueta": "CON", "Fuente": "Mercado"})
 
-        # Emociones (Mercado) con etiqueta Positive/Negative
+        # --- Emociones (Mercado) con etiqueta Positive/Negative, ignorando headers) ---
         emociones_texto = str(resultados.get("emociones", ""))
         current_label = ""  # "Positive" o "Negative"
+
+        pat_pos = re.compile(
+            r'^\s*POSITIVE\s+EMOTION(S)?\s*:?\s*$', flags=re.I)
+        pat_neg = re.compile(
+            r'^\s*NEGATIVE\s+EMOTION(S)?\s*:?\s*$', flags=re.I)
+
         for raw in emociones_texto.split("\n"):
             l = raw.strip().strip("-• ").strip()
             if not l:
                 continue
-            up = l.upper()
-            if up.startswith("POSITIVE EMOTIONS"):
+
+            # Detecta headers "POSITIVE EMOTION(S)" / "NEGATIVE EMOTION(S)" y NO los agrega
+            if pat_pos.match(l):
                 current_label = "Positive"
                 continue
-            if up.startswith("NEGATIVE EMOTIONS"):
+            if pat_neg.match(l):
                 current_label = "Negative"
                 continue
+
+            # También soporta formato con prefijos [+] / [-]
             if l.startswith("[+]"):
                 current_label = "Positive"
                 l = l[3:].strip()
             elif l.startswith("[-]"):
                 current_label = "Negative"
                 l = l[3:].strip()
-            data.append({"Tipo": "Emoción", "Contenido": l,
-                         "Etiqueta": current_label, "Fuente": "Mercado"})
+
+            # Agrega la emoción con la etiqueta vigente
+            data.append({
+                "Tipo": "Emoción",
+                "Contenido": l,
+                "Etiqueta": current_label,
+                "Fuente": "Mercado",
+            })
 
         # Léxico editorial (Keywords)
         if (lexico := resultados.get("lexico_editorial")):
