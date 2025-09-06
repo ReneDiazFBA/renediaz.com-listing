@@ -1,6 +1,5 @@
-# mercado/loader_inputs_listing.py — v3.9
-# Marca: CustData!E12 (iloc[11,4])
-# Tokens semánticos: SOLO desde st.session_state["df_lemas_cluster"]
+# mercado/loader_inputs_listing.py — v3.9 FIX
+# Arreglo: _get_brand_e12 ahora soporta ExcelFile, dict{sheet:df} o DataFrame.
 
 import streamlit as st
 import pandas as pd
@@ -8,7 +7,7 @@ import re
 import unicodedata
 from typing import Dict, List, Optional, Any
 
-VERSION_TAG = "loader_inputs_listing v3.9"
+VERSION_TAG = "loader_inputs_listing v3.9-fix"
 
 # ----------------------------
 # Helpers
@@ -80,28 +79,40 @@ def _split_tokens_pos_neg(text: str):
     return pos, neg
 
 # ----------------------------
-# Marca: CustData!E12
+# Marca: CustData!E12  (FIX: soporta ExcelFile / dict / DataFrame)
 # ----------------------------
 
 
 def _get_brand_e12() -> str:
-    try:
-        excel_data = st.session_state.get("excel_data")
-        if not isinstance(excel_data, dict):
-            return ""
-        if "CustData" not in excel_data:
-            return ""
-        df = excel_data["CustData"]
-        if not isinstance(df, pd.DataFrame):
-            return ""
-        # E12 = fila 11, col 4 (0-based)
-        if df.shape[0] > 11 and df.shape[1] > 4:
-            val = df.iloc[11, 4]
-            s = "" if pd.isna(val) else str(val).strip()
-            if s and _norm(s) not in ("nan", "none", ""):
-                return s
-    except Exception:
+    """
+    Lee exactamente CustData!E12 (fila 11, col 4 0-based) desde:
+    - st.session_state["excel_data"] como pd.ExcelFile (parse)
+    - o como dict {sheet_name: DataFrame}
+    - o como DataFrame ya correspondiente a CustData
+    Devuelve el valor tal cual (string).
+    """
+    excel = st.session_state.get("excel_data")
+
+    # Caso 1: ExcelFile -> parse hoja CustData (sin header importa; usamos iloc)
+    if isinstance(excel, pd.ExcelFile):
+        df = excel.parse("CustData", header=None)
+        return str(df.iloc[11, 4])
+
+    # Caso 2: dict de hojas -> DataFrame
+    if isinstance(excel, dict):
+        # Preferimos la clave exacta; toleramos variantes comunes de capitalización
+        for k in ("CustData", "custdata", "Custdata"):
+            if k in excel and isinstance(excel[k], pd.DataFrame):
+                df = excel[k]
+                return str(df.iloc[11, 4])
+        # Si no se encontró la hoja, devolvemos vacío (tu flujo actual ignora si está vacío)
         return ""
+
+    # Caso 3: ya es un DataFrame (se asume que es la hoja CustData)
+    if isinstance(excel, pd.DataFrame):
+        return str(excel.iloc[11, 4])
+
+    # Formato inesperado
     return ""
 
 # ----------------------------
@@ -123,11 +134,10 @@ def cargar_lemas_clusters() -> pd.DataFrame:
 def construir_inputs_listing(resultados: dict,
                              df_edit: pd.DataFrame,
                              excel_data: object = None) -> pd.DataFrame:
-
     st.session_state["loader_inputs_listing_version"] = VERSION_TAG
     data: List[Dict[str, str]] = []
 
-    # Marca
+    # Marca (ahora sí se poblara cuando excel_data es ExcelFile)
     marca = _get_brand_e12()
     if marca:
         data.append({"Tipo": "Marca", "Contenido": marca,
@@ -181,8 +191,10 @@ def construir_inputs_listing(resultados: dict,
 
     # Contraste
     if isinstance(df_edit, pd.DataFrame) and not df_edit.empty:
-        val_cols = [c for c in df_edit.columns if re.search(
-            r"(valor|value)\s*[_\-]?[1-4]", str(c), flags=re.I)]
+        val_cols = []
+        for c in df_edit.columns:
+            if re.search(r"(?:^|[^A-Za-z])(valor|value)\s*[_\-]?\s*([1-4])(?:[^0-9]|$)", str(c), flags=re.I):
+                val_cols.append(c)
 
         def _orden_val(cname: str) -> int:
             m = re.findall(r"[1-4]", str(cname))
@@ -247,7 +259,7 @@ def construir_inputs_listing(resultados: dict,
                     continue
                 cl = r.get(cluster_col, "")
                 data.append({"Tipo": "Token Semántico (Cluster)", "Contenido": token,
-                            "Etiqueta": f"Cluster {cl}" if str(cl) else "", "Fuente": "SemanticSEO"})
+                            "Etiqueta": f"Cluster {cl}" if str(cl) != "" else "", "Fuente": "SemanticSEO"})
 
     df = pd.DataFrame(
         data, columns=["Tipo", "Contenido", "Etiqueta", "Fuente"])
