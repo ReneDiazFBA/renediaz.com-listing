@@ -1,11 +1,10 @@
-import pandas as pd
+# mercado/loader_inputs_listing.py
+
 import streamlit as st
+import pandas as pd
 import re
+from typing import Dict, List, Optional, Tuple
 
-
-# ============================================================
-# Helpers
-# ============================================================
 
 def cargar_lemas_clusters() -> pd.DataFrame:
     """
@@ -17,32 +16,17 @@ def cargar_lemas_clusters() -> pd.DataFrame:
     return pd.DataFrame()
 
 
-# ============================================================
-# Constructor de la tabla final
-# ============================================================
-
-def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.DataFrame:
+def construir_inputs_listing(resultados: dict,
+                             df_edit: pd.DataFrame,
+                             excel_data: object = None) -> pd.DataFrame:
     """
-    Arma la tabla final (una sola) con:
-      - Nombre sugerido
-      - Descripción breve
-      - Beneficios (1/fila)
-      - Buyer persona
-      - Pros / Cons
-      - Emociones
-      - Léxico editorial
-      - Visual
-      - Contraste:
-          * Etiqueta = valor de "Atributo Cliente" (estrictamente)
-          * Tipo: usa columna "Tipo" si existe (Atributo/Variación); si no, 1 valor -> Atributo, 2+ -> Variación
-          * Contenido = cada Valor 1..4 no vacío
-          * Fuente = "Contraste"
-      - Tokens semánticos (si hay clusters)
+    Construye la tabla final con Reviews + Contraste + Semántico.
+    En Contraste, la columna Etiqueta toma el valor de "Atributo Cliente".
     """
     data = []
 
     # ------------------------------
-    # Reviews básicos
+    # Reviews
     # ------------------------------
     if isinstance(resultados, dict):
         if (nombre := resultados.get("nombre_producto")):
@@ -132,13 +116,13 @@ def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.Data
             })
 
     # ------------------------------
-    # CONTRASTE (df_edit) — Etiqueta = valor EXACTO de "Atributo Cliente"
+    # CONTRASTE
     # ------------------------------
     if df_edit is not None and isinstance(df_edit, pd.DataFrame) and not df_edit.empty:
-        # Detectar columnas Valor 1..4 de forma robusta (Valor/Value con o sin guión/bajo/espacio)
+        # detectar columnas Valor 1..4
         val_cols = []
         for c in df_edit.columns:
-            if re.search(r"(?:^|[^A-Za-z])(valor|value)\s*[_\-]?\s*([1-4])(?:[^0-9]|$)", str(c), flags=re.I):
+            if re.search(r"(?:^|[^A-Za-z])(valor|value)\s*[_\-]?\s*([1-4])", str(c), flags=re.I):
                 val_cols.append(c)
 
         def _orden_val(cname: str) -> int:
@@ -149,13 +133,11 @@ def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.Data
         has_tipo = "Tipo" in df_edit.columns
 
         for _, row in df_edit.iterrows():
-            # Etiqueta = valor de "Atributo Cliente" (sin fallback)
             etiqueta_cliente = str(row.get("Atributo Cliente", "")).strip()
             if not etiqueta_cliente:
-                # Si no hay Atributo Cliente, no generamos filas de contraste (evitamos literales)
-                continue
+                continue  # si está vacío, no generamos fila
 
-            # Extraer valores no vacíos de Valor 1..4
+            # valores
             values = []
             for c in val_cols:
                 v = str(row.get(c, "")).strip()
@@ -163,13 +145,12 @@ def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.Data
                     values.append(v)
 
             if not values:
-                # sin valores no generamos salida (regla estricta)
                 continue
 
-            # Determinar tipo (preferir columna 'Tipo' si viene)
+            # tipo
             if has_tipo:
                 t_raw = str(row.get("Tipo", "")).strip().lower()
-                if "variac" in t_raw:    # 'variación' / 'variacion'
+                if "variac" in t_raw:
                     tipo = "Variación"
                 elif "atribut" in t_raw:
                     tipo = "Atributo"
@@ -178,7 +159,7 @@ def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.Data
             else:
                 tipo = "Atributo" if len(values) == 1 else "Variación"
 
-            # Emitir filas
+            # generar filas
             if tipo == "Atributo" and len(values) == 1:
                 data.append({
                     "Tipo": "Atributo",
@@ -196,7 +177,7 @@ def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.Data
                     })
 
     # ------------------------------
-    # Tokens semánticos (clusters)
+    # Tokens semánticos
     # ------------------------------
     df_semantic = cargar_lemas_clusters()
     if not df_semantic.empty:
@@ -213,16 +194,11 @@ def construir_inputs_listing(resultados: dict, df_edit: pd.DataFrame) -> pd.Data
                     "Fuente": "SemanticSEO"
                 })
 
-    # Salida
     df = pd.DataFrame(data)
     if not df.empty:
         df.dropna(how="all", inplace=True)
     return df
 
-
-# ============================================================
-# Carga desde sesión (compat)
-# ============================================================
 
 def cargar_inputs_para_listing() -> pd.DataFrame:
     """
