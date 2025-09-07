@@ -1,9 +1,9 @@
 # listing/prompts_listing_copywrite.py
 # Master prompt (EN) for generating the entire Amazon listing in one call:
 # Titles (desktop & mobile per variation), Bullets, Description, Backend search terms.
-# All briefs below are OPERATIVE (seen by the model). Nothing here is just "for humans".
+# All briefs below are OPERATIVE (they are part of the actual prompt).
 
-from typing import List
+from typing import List, Optional
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1) AMAZON GUIDELINES – GENERAL CONTRACT (hard rules)
@@ -63,11 +63,11 @@ All copy is derived from a structured table with columns: Tipo, Contenido, Etiqu
 Your inputs are faithful projections of that table.
 
 MAPPING (table → inputs here):
-- Brand: rows where Tipo = "Marca" → provided implicitly via head_phrases when present.
+- Brand: rows where Tipo = "Marca" → may be present via head_phrases and/or explicit brand input. Do not invent a brand.
 - Buyer Persona: rows where Tipo = "Buyer persona" → provided as buyer_persona (string).
 - Emotions: rows where Tipo = "Emoción" → provided as emotions (list). Etiqueta 'Positive' amplifies desires; 'Negative' or 'CON' addresses pains/objections.
   Map only relevant ones to 8 core emotions: Status & Recognition; Financial Security; Time & Efficiency; Relationship & Connection;
-  Confidence & Competence; Growth & Achievement; Safety & Peace of Mind; Pleasure & Enjoyment. Identify primary/secondary emotions internally (no separate field required).
+  Confidence & Competence; Growth & Achievement; Safety & Peace of Mind; Pleasure & Enjoyment. Identify primary/secondary emotions internally.
 - Benefits / Obstacles: captured in benefits list; weave PRO as advantages and CON as objections resolution.
 - Lexicon & Tone: rows where Tipo = "Léxico editorial" → provided as lexico (string). Use those terms and stylistic cues verbatim where natural.
 - SEO Semantics: rows where Tipo = "SEO semántico" (Etiqueta: Core/Cluster) → provided via core_tokens (Core preferred) and may also appear in variations/attributes.
@@ -192,19 +192,16 @@ def prompt_master_json(
     emotions: List[str],
     buyer_persona: str,
     lexico: str,
+    brand: Optional[str] = None,  # <-- ADDED to match callers that pass brand=
 ) -> str:
     """
     Build the operative prompt for a single-run listing generation.
-    Inputs are projections of the consolidated table:
-      - head_phrases: may include brand and seed phrases if present (do NOT invent brand)
-      - core_tokens: semantic core lemmas (for product name + keywording)
-      - attributes: attribute VALUES (not labels), already filtered/normalized
-      - variations: variation VALUES (size/color/pack/etc.)
-      - benefits: top market-validated benefits/advantages (and obstacles enums where applicable)
-      - emotions: raw list of emotions with implicit polarity (Positive/Negative in upstream)
-      - buyer_persona: avatar summary
-      - lexico: editorial lexicon to use verbatim where natural
+    Inputs are projections of the consolidated table.
+    'brand' is optional; if provided, it is used only as a guardrail (never invent a brand).
     """
+
+    brand_note = f"(explicit brand present: {brand})" if (
+        brand and str(brand).strip()) else "(no explicit brand provided)"
 
     return f"""
 You are an Amazon Listing Copywriter. Produce the entire listing in ONE pass and return ONLY VALID JSON.
@@ -225,6 +222,7 @@ CONTRACTS (SPECIFIC PER OUTPUT):
 
 DATA INPUTS (table-derived projections; treat them as the single source of truth):
 - Head phrases (may include brand/seed phrases if present; do NOT invent): {head_phrases}
+- Explicit brand guardrail {brand_note}
 - Core semantic tokens (ONLY source for product name “what”): {core_tokens}
 - Attributes (VALUES only, candidate key features; exclude anything that is a variation): {attributes}
 - Variations (VALUES only; generate per-variation titles; adapt bullets only if bullet targets variation): {variations}
@@ -262,7 +260,6 @@ Return ONLY the JSON object. No explanations.
 # ─────────────────────────────────────────────────────────────────────────────
 # Backward-compat alias (so existing imports don't break)
 # ─────────────────────────────────────────────────────────────────────────────
-# Some modules import PROMPT_MASTER_JSON; keep compatibility by exposing the same callable.
 PROMPT_MASTER_JSON = prompt_master_json
 
 __all__ = [
