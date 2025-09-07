@@ -1,114 +1,299 @@
 # listing/funcional_listing_copywrite.py
-# IA-only: genera Title + Bullets + Description + Backend con gpt-4o-mini
-# Requiere: OPENAI_API_KEY en st.secrets o variable de entorno
+# Extracts inputs from the consolidated table and calls OpenAI once to generate:
+# Titles (desktop+mobile per variation), 5 bullets, description, backend (EN).
+# Adds Quality & Compliance checks + optional auto-fixes.
 
 import os
-import json
 import re
+import json
+from typing import Dict, List, Tuple, Any
 import pandas as pd
-import streamlit as st
 
-from listing.funcional_listing_datos import get_insumos_copywrite
-from listing.prompts_listing_copywrite import prompt_master_json
+from listing.prompts_listing_copywrite import prompt_master_json_all
 
-# --- util: limpia cercas de código y trailing ---
+# ───────────── Projections from the unified table ─────────────
 
 
-def _strip_code_fences(txt: str) -> str:
-    if not isinstance(txt, str):
-        return txt
-    # quita ```json ... ``` o ``` ... ```
-    txt = re.sub(r"^```(?:json)?\s*", "", txt.strip(), flags=re.I)
-    txt = re.sub(r"\s*```$", "", txt, flags=re.I)
-    return txt.strip()
+def _pick(df: pd.DataFrame, tipo_eq: str) -> List[str]:
+    if df.empty:
+        return []
+    m = df["Tipo"].astype(str).str.strip(
+    ).str.lower() == tipo_eq.strip().lower()
+    return df.loc[m, "Contenido"].dropna().astype(str).str.strip().tolist()
 
 
-def _safe_json_loads(s: str) -> dict:
-    s = _strip_code_fences(s)
-    try:
-        return json.loads(s)
-    except Exception:
-        # intenta recortar basura antes/después del primer/último brace
-        m = re.search(r"\{.*\}\s*$", s, flags=re.S)
-        if m:
-            try:
-                return json.loads(m.group(0))
-            except Exception:
-                pass
-        raise
+def _brand(df: pd.DataFrame) -> str:
+    vals = _pick(df, "Marca")
+    return vals[0].strip() if vals else ""
 
 
-def _get_api_key() -> str:
-    # prioridad a st.secrets
-    try:
-        k = st.secrets.get("OPENAI_API_KEY", "")
-        if k:
-            return k
-    except Exception:
-        pass
-    return os.environ.get("OPENAI_API_KEY", "")
+def _attributes(df: pd.DataFrame) -> List[str]:
+    return _pick(df, "Atributo")
 
 
-def lafuncionqueejecuta_listing_copywrite(
-    inputs_df: pd.DataFrame,
-) -> dict:
-    """
-    IA-only. Construye insumos desde la tabla maestra y llama a gpt-4o-mini.
-    Devuelve dict con keys: title, bullets[5], description, search_terms.
-    """
+def _variations(df: pd.DataFrame) -> List[str]:
+    return _pick(df, "Variación")
+
+
+def _benefits(df: pd.DataFrame) -> List[str]:
+    out = set(_pick(df, "Beneficio"))
+    out.update(_pick(df, "Beneficio valorado"))
+    out.update(_pick(df, "Ventaja"))
+    return [x for x in out if x]
+
+
+def _obstacles(df: pd.DataFrame) -> List[str]:
+    return _pick(df, "Obstáculo")
+
+
+def _emotions(df: pd.DataFrame) -> List[str]:
+    return _pick(df, "Emoción")
+
+
+def _lexicon(df: pd.DataFrame) -> str:
+    vals = _pick(df, "Léxico editorial")
+    return vals[0] if vals else ""
+
+
+def _core_tokens(df: pd.DataFrame) -> List[str]:
+    if df.empty:
+        return []
+    m = df["Tipo"].astype(str).str.lower().str.contains("seo sem", na=False)
+    sub = df.loc[m, ["Contenido", "Etiqueta"]].dropna(how="all")
+    if sub.empty:
+        return []
+    core = sub[sub["Etiqueta"].astype(str).str.lower().eq("core")]
+    if not core.empty:
+        vals = core["Contenido"].dropna().astype(str).str.strip().tolist()
+        return list(dict.fromkeys([v for v in vals if v]))
+    vals = sub["Contenido"].dropna().astype(str).str.strip().tolist()
+    return list(dict.fromkeys([v for v in vals if v]))[:50]
+
+# ───────────── Utilities: compliance & auto-fix ─────────────
+
+
+DISALLOWED_TITLE_CHARS = set("!$?_^¬¦{}")
+
+
+def bytes_no_spaces(s: str) -> int:
+    return len((s or "").replace(" ", "").encode("utf-8"))
+
+
+def check_title_item(item: Dict[str, str]) -> List[str]:
+    issues = []
+    for k in ("variation", "desktop", "mobile"):
+        if k not in item:
+            issues.append(f"missing key '{k}'")
+            return issues
+    d, m = item["desktop"], item["mobile"]
+    if len(d) < 150 or len(d) > 180:
+        issues.append(f"desktop length {len(d)} outside 150–180")
+    if len(m) < 75 or len(m) > 80:
+        issues.append(f"mobile length {len(m)} outside 75–80")
+    # disallowed chars
+    if any(ch in DISALLOWED_TITLE_CHARS for ch in d):
+        issues.append("desktop contains disallowed characters")
+    if any(ch in DISALLOWED_TITLE_CHARS for ch in m):
+        issues.append("mobile contains disallowed characters")
+    # duplicate word > 2 times (rough check)
+
+    def _dup_chk(txt: str) -> bool:
+        words = re.findall(r"[A-Za-z0-9]+", txt.lower())
+        counts = {}
+        for w in words:
+            counts[w] = counts.get(w, 0) + 1
+            if counts[w] > 2:
+                return True
+        return False
+    if _dup_chk(d):
+        issues.append("desktop repeats a word more than twice")
+    if _dup_chk(m):
+        issues.append("mobile repeats a word more than twice")
+    return issues
+
+
+def truncate_to_limit(text: str, max_len: int) -> str:
+    if len(text) <= max_len:
+        return text
+    cut = text[:max_len]
+    # try to cut at a safe boundary
+    for sep in [" - ", ", ", " "]:
+        idx = cut.rfind(sep)
+        if idx >= 50:  # avoid chopping too early
+            return cut[:idx].rstrip()
+    return cut.rstrip()
+
+
+HEADER_COLON_RE = re.compile(r"^[A-Z0-9\s\-&]+:\s")
+
+
+def check_bullets(bullets: List[str]) -> List[str]:
+    issues = []
+    if not isinstance(bullets, list) or len(bullets) != 5:
+        return ["must return exactly 5 bullets"]
+    seen = set()
+    for i, b in enumerate(bullets, 1):
+        L = len(b or "")
+        if L < 130 or L > 180:
+            issues.append(f"bullet {i} length {L} outside 130–180")
+        if not HEADER_COLON_RE.match(b or ""):
+            issues.append(
+                f"bullet {i} must start with ALL-CAPS HEADER followed by colon")
+        # uniqueness (rough)
+        norm = re.sub(r"\W+", " ", (b or "").lower()).strip()
+        if norm in seen:
+            issues.append(f"bullet {i} duplicates another bullet")
+        seen.add(norm)
+    return issues
+
+
+def collect_surface_words(payload: Dict[str, Any]) -> set:
+    text = []
+    for t in payload.get("titles", []):
+        text += [t.get("desktop", ""), t.get("mobile", "")]
+    text += payload.get("bullets", [])
+    text.append(payload.get("description", ""))
+    bag = set(w for w in re.findall(r"[a-z0-9]+", " ".join(text).lower()))
+    return bag
+
+
+def trim_backend(backend: str, min_bytes: int = 243, max_bytes: int = 249) -> str:
+    tokens = [t for t in (backend or "").split() if t]
+    # collapse duplicates, keep order
+    seen = set()
+    dedup = []
+    for t in tokens:
+        if t.lower() not in seen:
+            seen.add(t.lower())
+            dedup.append(t)
+    out = " ".join(dedup)
+    # trim from the end while > max
+    while bytes_no_spaces(out) > max_bytes and dedup:
+        dedup.pop()  # drop last
+        out = " ".join(dedup)
+    return out
+
+
+def scrub_backend_surface_overlap(backend: str, surface_words: set) -> str:
+    tokens = [t for t in (backend or "").split() if t]
+    kept = [t for t in tokens if t.lower() not in surface_words]
+    return " ".join(kept) if kept else backend
+
+
+def check_backend(backend: str) -> List[str]:
+    issues = []
+    b = bytes_no_spaces(backend)
+    if b < 243 or b > 249:
+        issues.append(f"backend bytes {b} (spaces removed) outside 243–249")
+    # commas or html
+    if "," in (backend or "") or "<" in (backend or "") or ">" in (backend or ""):
+        issues.append(
+            "backend must be space-separated tokens (no commas/HTML)")
+    return issues
+
+
+def compliance_report(payload: Dict[str, Any]) -> Dict[str, Any]:
+    rep = {"titles": [], "bullets": [], "backend": []}
+    for item in payload.get("titles", []):
+        rep["titles"].append({
+            "variation": item.get("variation", ""),
+            "issues": check_title_item(item)
+        })
+    rep["bullets"] = check_bullets(payload.get("bullets", []))
+    rep["backend"] = check_backend(payload.get("search_terms", ""))
+    return rep
+
+
+def apply_auto_fixes(payload: Dict[str, Any],
+                     fix_titles: bool = True,
+                     fix_backend: bool = True) -> Dict[str, Any]:
+    data = json.loads(json.dumps(payload))  # deep copy
+
+    if fix_titles:
+        new_titles = []
+        for t in data.get("titles", []):
+            d = t.get("desktop", "")
+            m = t.get("mobile", "")
+            # Only trim if too long; if too short, keep (manual pass preferred)
+            if len(d) > 180:
+                d = truncate_to_limit(d, 180)
+            if len(m) > 80:
+                m = truncate_to_limit(m, 80)
+            new_titles.append({**t, "desktop": d, "mobile": m})
+        data["titles"] = new_titles
+
+    if fix_backend:
+        backend = data.get("search_terms", "")
+        # remove tokens present in surface copy
+        surface = collect_surface_words(data)
+        backend = scrub_backend_surface_overlap(backend, surface)
+        # trim to byte window
+        backend = trim_backend(backend, 243, 249)
+        data["search_terms"] = backend
+
+    return data
+
+# ───────────── OpenAI one-shot ─────────────
+
+
+def generar_listing_completo_desde_df(inputs_df: pd.DataFrame, model: str = "gpt-4o-mini") -> Dict:
     if not isinstance(inputs_df, pd.DataFrame) or inputs_df.empty:
-        raise ValueError("inputs_df está vacío.")
+        raise ValueError(
+            "inputs_df is empty. Build 'inputs_para_listing' first.")
+    for col in ("Tipo", "Contenido", "Etiqueta", "Fuente"):
+        if col not in inputs_df.columns:
+            raise ValueError(f"Missing required column in inputs_df: {col}")
 
-    api_key = _get_api_key()
+    brand = _brand(inputs_df)
+    core = _core_tokens(inputs_df)
+    attrs = _attributes(inputs_df)
+    vars_ = _variations(inputs_df)
+    bens = _benefits(inputs_df)
+    cons = _obstacles(inputs_df)
+    emos = _emotions(inputs_df)
+    lexico = _lexicon(inputs_df)
+    persona_vals = _pick(inputs_df, "Buyer persona")
+    persona = persona_vals[0] if persona_vals else ""
+
+    prompt = prompt_master_json_all(
+        brand=brand,
+        core_tokens=core,
+        attributes=attrs,
+        variations=vars_,
+        benefits=bens,
+        obstacles=cons,
+        emotions=emos,
+        buyer_persona=persona,
+        lexico=lexico,
+    )
+
+    api_key = os.getenv("OPENAI_API_KEY", "")
     if not api_key:
-        raise RuntimeError("Falta OPENAI_API_KEY (st.secrets o env).")
+        raise RuntimeError(
+            "OPENAI_API_KEY not found. Set it before generating the listing.")
 
-    # 1) Compactar insumos desde la tabla
-    ins = get_insumos_copywrite(inputs_df)
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key)
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.4,
+            max_tokens=2200,
+        )
+        content = resp.choices[0].message.content
+        data = json.loads(content)
 
-    # 2) Prompt maestro (JSON-only)
-    prompt = prompt_master_json(
-        head_phrases=ins.get("head_phrases", []),
-        core_tokens=ins.get("core_tokens", []),
-        attributes=ins.get("attributes", []),
-        variations=ins.get("variations", []),
-        benefits=ins.get("benefits", []),
-        emotions=ins.get("emotions", []),
-        buyer_persona=ins.get("buyer_persona", ""),
-        lexico=ins.get("lexico", ""),
-    )
+        # minimal schema checks
+        for k in ("titles", "bullets", "description", "search_terms"):
+            if k not in data:
+                raise ValueError(f"Missing key in AI response: {k}")
+        if not isinstance(data["bullets"], list) or len(data["bullets"]) != 5:
+            raise ValueError("AI must return exactly 5 bullets.")
 
-    # 3) Llamada a OpenAI (chat.completions con gpt-4o-mini)
-    #    Nota: mantenemos simple y robusto
-    from openai import OpenAI
-    client = OpenAI(api_key=api_key)
+        # attach compliance snapshot
+        data["_compliance"] = compliance_report(data)
+        return data
 
-    resp = client.chat.completions.create(
-        model="gpt-4o-mini",
-        temperature=0.6,
-        messages=[
-            {"role": "system", "content": "You are a meticulous Amazon listing copywriter that ONLY returns valid JSON as instructed."},
-            {"role": "user", "content": prompt},
-        ],
-        response_format={"type": "json_object"},
-    )
-
-    content = resp.choices[0].message.content if resp.choices else ""
-    data = _safe_json_loads(content)
-
-    # 4) Validación mínima (sin fallback creativo)
-    #    Si faltan campos críticos, lanzamos error (preferible a inventar)
-    for k in ("title", "bullets", "description", "search_terms"):
-        if k not in data:
-            raise ValueError(f"Respuesta IA incompleta: falta '{k}'.")
-
-    # Normaliza tipos
-    if not isinstance(data["bullets"], list):
-        raise ValueError("El campo 'bullets' debe ser una lista de 5 strings.")
-
-    return {
-        "title": str(data["title"]),
-        "bullets": [str(x) for x in data["bullets"]][:5],
-        "description": str(data["description"]),
-        "search_terms": str(data["search_terms"]),
-    }
+    except Exception as e:
+        raise RuntimeError(f"OpenAI call failed: {e}")

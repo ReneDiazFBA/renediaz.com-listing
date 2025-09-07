@@ -1,116 +1,180 @@
 # listing/prompts_listing_copywrite.py
-# Prompts EN – TÍTULOS únicamente (desktop + mobile por variación).
-# Mantiene dos marcos globales: Amazon guidelines + Editorial brief.
-# Genera SOLO JSON con: {"titles":[{"variation":"","desktop":"...","mobile":"..."}...]}
+# All-in-one prompts for Title(s) + Bullets + Description + Backend (EN).
+# This prompt stack enforces Amazon guidelines + your editorial brief,
+# and adds specific contracts per section.
 
 from typing import List
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 1) AMAZON – MARCO GENERAL (siempre activo)
-# ─────────────────────────────────────────────────────────────────────────────
 AMAZON_GUIDELINES_BRIEF = """
-AMAZON LISTING – GLOBAL POLICY (ALWAYS APPLY)
-- No promotional language: no "free", "discount", "sale", "coupon", "shipping", "#1/best".
-- No competitor mentions; avoid subjective claims ("top-rated", "must-have").
-- No prohibited characters in titles: !, $, ?, _, {, }, ^, ¬, ¦.
-  Allowed punctuation: hyphen (-), slash (/), comma (,), ampersand (&), period (.).
-- Use digits for numbers ("2" not "two"); proper capitalization (no ALL CAPS).
-- Concise, clear, non-redundant; do not stuff keywords; avoid repeating the same word >2 times in a title.
-- Titles ≤200 chars (hard store limit, though we will target our custom caps below).
+AMAZON LISTING GUIDELINES — GLOBAL
+
+General:
+- Write in ENGLISH.
+- Do not include promotional language (“free shipping”, “#1”, “best”), competitor mentions, links, emails, phone numbers.
+- No emojis or decorative symbols. Disallowed in titles: !, $, ?, _, {, }, ^, ¬, ¦ (unless part of the registered brand name in the brand field by Amazon).
+- Use standard letters and numerals. No non-language ASCII like Æ, Œ, Ÿ, etc.
+- Use numerals for numbers (2 not "two"). Space between digit and measurement (e.g., 60 ml).
+- Avoid subjective, unverifiable performance or comparative claims. No awards unless substantiated elsewhere on the page.
+
+Title (hard rules):
+- ≤ 200 characters (including spaces) as global max.
+- No promotional phrases. Do not repeat the same word more than twice (prepositions/articles/conjunctions are exceptions).
+- Prefer concise, scannable structure. Case style: Capitalize first letter of each main word (title case), not ALL CAPS.
+- Allowed punctuation: hyphens (-), slashes (/), commas (,), ampersands (&), periods (.).
+- Put size/color/pack in child variations; parent titles should not duplicate variation values.
+
+Bullets:
+- 5 feature bullets recommended (we will generate exactly 5).
+- Each bullet conveys UNIQUE info; remove redundancy. Sentence fragments, no terminal punctuation; use semicolons to separate phrases.
+- No special symbols, links, contact details, guarantees, or prohibited green claims.
+- Use clear, natural language; highlight concrete features → benefits → use cases.
+
+Description:
+- Plain text; paragraphs separated by <br><br>. No HTML beyond those breaks.
+- Story + benefits + objection handling; consistent with bullets and title.
+
+Backend Search Terms:
+- Space-separated tokens (no commas/HTML).
+- Do not repeat surface words already used in title/bullets/description.
+- May include misspellings or other languages when relevant.
+- Keep singular OR plural for a token family (not both).
 """
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 2) EDITORIAL – COMPORTAMIENTO VS TABLA
-# ─────────────────────────────────────────────────────────────────────────────
 EDITORIAL_BRIEF = """
-EDITORIAL BRIEF – TABLE-DRIVEN BEHAVIOR
-- Toda la copia deriva de una tabla con columnas: tipo, contenido, etiqueta.
-- Recibirás proyecciones ya filtradas de esa tabla (no inventes datos).
-- Buyer persona y léxico editorial orientan tono/claridad, pero NO se incluyen literalmente en el título salvo que aporten claridad del producto.
-- Si hay "Marca", úsala; si no hay, NO inventes.
+EDITORIAL BRIEF — INTEGRATED BEHAVIOR
+
+Input data comes from a structured table with columns: Tipo, Contenido, Etiqueta.
+You receive pre-extracted lists from that table; treat them as the ground truth.
+
+Mapping principles:
+- Buyer Persona: summarize who buys and why (tone + relevance).
+- Emotions: reinforce positive desires; acknowledge negative pains and pivot to resolution.
+- Benefits/Pros vs Obstacles/Cons: emphasize outcomes; address objections tactfully (1 slot).
+- Lexicon: adopt the editorial terms and style cues verbatim when appropriate (no keyword stuffing).
+- Brand: if provided, use it at the front of Titles. Do not invent a brand.
+
+Copy logic:
+- Amazon page = high intent; mix logic + emotion but stay specific and concrete.
+- Structure tends to: problem/pain → consequences → product solution → relatable use cases.
+- Subtle CTAs; never manipulative or non-compliant.
 """
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 3) TÍTULO – CONTRATO (desktop + mobile por variación)
-# ─────────────────────────────────────────────────────────────────────────────
 TITLE_BRIEF = """
-TITLE CONTRACT – DESKTOP & MOBILE (PER VARIATION)
+TITLE CONTRACT
 
-Inputs (ya filtrados de la tabla):
-- brand: string opcional (vacío si no hay marca).
-- cores: lista de tokens CORE que definen QUÉ es el producto. (El nombre del producto se arma SOLO con cores.)
-- atributos: lista de VALORES de atributos (no nombres). Priorizados por lo que dicen reviews.
-- variaciones: lista de strings. Se genera un par de títulos por cada variación.
-- context: descripción breve SOLO para entender el producto (no copiar literalmente).
+We generate TWO title lengths per variation:
+- Desktop: 150–180 characters (including spaces).
+- Mobile: 75–80 characters (including spaces).
 
-Taxonomía y separadores:
-- Forma: Brand + ProductName(from cores) - attr, attr - variation
-  • Entre bloques (WHAT / ATTRS / VAR): " - "
-  • Entre atributos: ", "
-  • Entre Brand y WHAT: sin separador especial (espacio normal).
-- No dupliques: si un valor aparece como variación, NO lo repitas como atributo.
-- Usa tantos atributos como entren antes del límite.
+Construction (in order):
+Brand + Product Name (built ONLY from core tokens; no invented terms) + Product Type
++ Key attribute values (not labels; values only, taken from prioritized attributes)
++ Variation (size/color/pack etc. — one title per variation with same base text)
+Separators:
+- Brand and Product Name/Product Type: space (no hyphen here)
+- Between blocks (product type ↔ attributes ↔ variation): " - "
+- Between multiple attributes: ", "
 
-Límites a cumplir:
-- DesktopTitle: 150–180 chars (incluyendo espacios).
-- MobileTitle: 75–80 chars (incluyendo espacios).
-- Además, Amazon: título ≤200 chars, sin promos ni caracteres prohibidos, sin palabras repetidas >2 veces.
+Strict rules:
+- Do NOT duplicate a value as both attribute and variation; if a review-prioritized attribute is actually tagged as variation, place it ONLY as variation.
+- Use as many attribute VALUES as fit within the target length; prioritize by review importance.
+- Title case (Capitalize Main Words), avoid ALL CAPS.
+- Respect Amazon disallowed characters and duplication limits.
 
-Capitalización y estilo:
-- No ALL CAPS. Capitaliza inicial de cada palabra relevante (excepto artículos/preposiciones/conjunciones comunes).
-- Usa dígitos (2, 3…), abreviaturas estándar de medida (cm, oz, in, kg) cuando aporte claridad.
+Output for titles: JSON array "titles" of objects:
+[
+  {"variation": "<exact variation value>", "desktop": "<150–180 chars>", "mobile": "<75–80 chars>"},
+  ...
+]
 """
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 4) PROMPT MASTER – SOLO TÍTULOS
-# ─────────────────────────────────────────────────────────────────────────────
-def prompt_title_json(
-    head_phrases: List[str],
+BULLETS_BRIEF = """
+BULLETS CONTRACT
+
+- Exactly 5 bullets.
+- Each bullet 130–180 characters (including spaces).
+- Format: ALL-CAPS HEADER followed by colon, then sentence fragment (no final period). Use semicolons to split phrases.
+- Bullet anatomy: HEADER: Attribute value + resulting benefit + use case / scenario.
+- Integrate clusterized SEO tokens naturally (no stuffing).
+- Cover obstacles/cons by reframing in ONE bullet max.
+- If a bullet depends on variation (e.g., pack size), generate per-variation text in "variation_bullets" with the same bullet order.
+
+Output keys:
+"bullets": [str, str, str, str, str]
+"variation_bullets": { "<variation>": [str×5], ... }  # optional
+"""
+
+DESCRIPTION_BRIEF = """
+DESCRIPTION CONTRACT
+
+- Length: 1600–2000 characters (including spaces).
+- Plain text; separate paragraphs with <br><br>.
+- Blend narrative (pain → solution → outcomes) with concrete features/benefits.
+- Use persona cues and emotions from inputs; adopt editorial lexicon.
+- Must be consistent with Titles and Bullets; avoid redundancy.
+- Compliant: no promos, no competitors, no unverifiable claims.
+"""
+
+BACKEND_BRIEF = """
+BACKEND SEARCH TERMS CONTRACT
+
+- Space-separated tokens (no commas/HTML).
+- 243–249 BYTES when removing spaces (count UTF-8 bytes of the string with spaces removed).
+- Do NOT repeat any surface word used in Titles, Bullets, or Description.
+- May include misspellings and language variants when relevant.
+- Enforce singular OR plural per token family (not both).
+- Prefer long-tail variations derived from core semantic tokens and attributes.
+"""
+
+
+def prompt_master_json_all(
+    brand: str,
     core_tokens: List[str],
     attributes: List[str],
     variations: List[str],
+    benefits: List[str],
+    obstacles: List[str],
+    emotions: List[str],
     buyer_persona: str,
     lexico: str,
-    brand: str = "",
-    context_short: str = "",
 ) -> str:
-    """
-    Devuelve un prompt para generar EXCLUSIVAMENTE títulos:
-      - Un par por variación: desktop (150–180) y mobile (75–80)
-      - Si no hay variaciones, devolver un par con "variation": "".
-
-    Notas:
-    - ProductName se arma SOLO con core_tokens.
-    - attributes = VALORES priorizados (no nombres).
-    - variations = child options; no dupliques atributos que ya son variaciones.
-    - head_phrases: semillas opcionales (si existen), p.ej. brand cues o hints útiles.
-    """
-
     return f"""{AMAZON_GUIDELINES_BRIEF}
 
 {EDITORIAL_BRIEF}
 
 {TITLE_BRIEF}
 
-ROLE:
-You are an Amazon listing copywriter. Generate ONLY titles (desktop + mobile) per variation,
-strictly following the contract and global policies. Do not output any other section.
+{BULLETS_BRIEF}
 
-RETURN STRICT JSON:
+{DESCRIPTION_BRIEF}
+
+{BACKEND_BRIEF}
+
+You are an Amazon listing copywriter. Generate the FULL LISTING in ENGLISH.
+Use ONLY the inputs below (they are projections from a structured table: Tipo/Contenido/Etiqueta):
+
+Brand (from table, if present): {brand}
+Core semantic tokens (lemmas; foundation for Product Name): {core_tokens}
+Attribute VALUES (prioritized by reviews; no labels): {attributes}
+Variations (size/color/pack etc. — one title per variation): {variations}
+Benefits (market-validated): {benefits}
+Obstacles/Cons (to tactfully address once): {obstacles}
+Emotions (raw list): {emotions}
+Buyer persona (avatar): {buyer_persona}
+Editorial lexicon (exact terms/style to adopt): {lexico}
+
+Return ONLY valid JSON with this exact schema:
 {{
   "titles": [
-    {{"variation": "<variation or empty>", "desktop": "<150–180 chars>", "mobile": "<75–80 chars>"}}
-  ]
+    {{"variation":"<variation>", "desktop":"<150–180 chars>", "mobile":"<75–80 chars>"}}
+  ],
+  "bullets": ["<130–180>", "<130–180>", "<130–180>", "<130–180>", "<130–180>"],
+  "variation_bullets": {{
+    "<variation>": ["<130–180>", "<130–180>", "<130–180>", "<130–180>", "<130–180>"]
+  }},
+  "description": "<1600–2000 chars with <br><br> separators>",
+  "search_terms": "<243–249 bytes when removing spaces>"
 }}
 
-INPUTS:
-Brand (empty if none): {brand}
-Core tokens (WHAT – build ProductName ONLY from these): {core_tokens}
-Attribute VALUES (prioritized by reviews; do not repeat values used as variations): {attributes}
-Variations (one pair of titles per variation; if empty, return one pair with variation=""): {variations}
-Head phrases (optional seeds): {head_phrases}
-Buyer persona (context for clarity; do not copy literally): {buyer_persona}
-Editorial lexicon (style/terms cues; do not force into title if unnatural): {lexico}
-Short context (for understanding only; do not copy literally): {context_short}
+Strictly follow all contracts above.
 """
-Í
