@@ -3,11 +3,9 @@
 
 from typing import List
 
-# ============================================================
-# AMAZON — GENERAL POLICY GUIDELINES (Contrato de cumplimiento)
-# Sustituye al antiguo POLICY_BRIEF
-# ============================================================
-
+# -----------------------------
+# Amazon General Guidelines (hard policies)
+# -----------------------------
 AMAZON_GUIDELINES_BRIEF = """
 AMAZON LISTING – GENERAL POLICY GUIDELINES
 
@@ -21,90 +19,95 @@ TITLE
 - No ALL CAPS, no promotional language ("free shipping", "best", "#1"), no competitor mentions.
 - No special characters: !, $, ?, _, {, }, ^, ¬, ¦. Use only standard punctuation (- , / & .).
 - No redundant words or unnecessary synonyms.
-- Parent ASIN: generic title (no variation details). Child ASIN: include the variation (color/size).
+- For parent ASINs: keep generic (no variation details). For child ASINs: include color/size variation.
 
 BULLETS
-- 5 bullets recommended, each concise (<200 characters is a safe target; hard max varies by category).
+- 5 bullets recommended, each <200 characters (hard max ~500).
 - Structure: Attribute + Benefit + Use case.
-- Start with capital letter; avoid trailing punctuation.
-- No subjective claims ("amazing", "perfect") and no promotions.
-- Keep bullet structure consistent across variations.
+- Begin with capital letter, no ending punctuation.
+- No subjective claims ("amazing", "perfect"), no promotions.
+- Be consistent across variations.
 
 DESCRIPTION
 - 1,600–2,000 characters recommended.
 - Plain text only; separate paragraphs with <br><br>.
-- Expand bullets into narrative (benefits, objections handled, use-cases).
-- No HTML tags (beyond <br><br> as separators), no emojis, no promotions.
+- Expand bullets into narrative: story, benefits, objections addressed.
+- No HTML, emojis, or promotional claims.
 
 SEARCH TERMS (Backend Keywords)
 - Limit: 249 bytes max (measured without spaces).
-- Do not repeat surface words from title, bullets, or description.
-- Space-separated only (no commas or punctuation).
-- Include synonyms, common misspellings, and relevant foreign terms.
+- Do not repeat words from title, bullets, or description.
+- Space-separated only (no commas, no punctuation).
+- Include synonyms, common misspellings, and foreign terms if relevant.
 - No brand names, ASINs, competitor references, or misleading terms.
 - Choose singular OR plural, not both.
 
 IMAGES
-- Main image: pure white background (RGB 255), product ≥85% of frame.
-- Professional photo only; no text, logos, watermarks, or misleading props.
-- High resolution: ≥1600 px longest side (zoom enabled).
-- Additional images: lifestyle, details, scale, and usage context.
+- Main image: pure white background (RGB 255), product occupies ≥85% of frame.
+- Professional photo only; no text, logos, watermarks, or props that mislead.
+- High resolution: ≥1600 px longest side to enable zoom.
+- Additional images: lifestyle, detail shots, scale, usage context.
 
 VARIATIONS
-- Allowed only when differences are a consistent attribute (size/color/pack).
-- Parent: generic title/images. Child: variation-specific title/images.
+- Allowed only when products differ by a consistent attribute (e.g., size, color, pack).
+- Parent = generic title and images. Child ASINs = variation-specific title + images.
 - Do not group unrelated products.
 
 GENERAL PROHIBITIONS
 - No false or unverifiable claims.
-- No reviews, quotes, or testimonials inside listing copy.
-- No time-sensitive info (events, tour dates, etc.).
+- No reviews, quotes, testimonials inside listing copy.
+- No time-sensitive info (events, tours, dates).
 - No contact details, external URLs, or ordering info.
-- One detail page = one unique product (no multi-product pages).
-- Ensure valid category/browse node and product identifiers (UPC/EAN).
+- Each detail page = one unique product. No multi-product detail pages.
+- Ensure category (browse node) and UPC/EAN are valid.
 
 Non-compliance may result in listing suppression, automated corrections, or removal.
 """
 
-# ============================================================
-# EDITORIAL BRIEF (lo iremos afinando más adelante)
-# ============================================================
-
+# -----------------------------
+# Editorial Brief (style, tone, emotions)
+# -----------------------------
 EDITORIAL_BRIEF = """
-EDITORIAL BRIEF – INTEGRATED VERSION (BEHAVIORAL RULES)
+EDITORIAL BRIEF – GENERAL COPYWRITING PRINCIPLES
 
-All copy is derived from a structured table with columns: tipo, contenido, etiqueta.
-Your inputs are pre-extracted lists from that table; treat them as faithful projections:
+1. Avatar (Buyer Persona)
+- Write for one clear person, not for a generic audience.
+- Mirror the language, concerns, and expressions found in reviews and inputs.
+- Identify frustrations, dreams, and objectives directly.
 
-MAPPING (table → inputs you receive):
-- Avatar (Buyer Persona): rows where tipo = "Buyer persona" → provided as buyer_persona (string).
-- Emotions: rows where tipo = "Emoción" → provided as emotions (list). etiqueta='Positivo' reinforce desires; etiqueta='Negativo' or 'CON' address pain/objections.
-  Map only relevant ones to the 8 core emotions: Status & Recognition; Financial Security; Time & Efficiency; Relationship & Connection;
-  Confidence & Competence; Growth & Achievement; Safety & Peace of Mind; Pleasure & Enjoyment. Identify primary and secondary emotions.
-- Story / Narrative: rows where tipo = "Obstáculo" and tipo = "Beneficio" → already summarized within benefits (list) and persona/lexicon.
-  Use PRO to emphasize advantages/desirable outcomes; use CON to acknowledge pains and pivot to resolution.
-- Placement: Amazon product page (high intent). Copy Triangle System:
-  Where → Amazon; Why → purchase intent; What → conversion.
-  Structure: start with problem/pain → agitate consequences → introduce the product as solution → relatable examples/use cases.
-  Best practices: benefit-led headlines, address objections, mix logic + emotion. CTAs must be subtle and compliant (no explicit “Buy now”).
-- Objective / Descripción breve: rows where tipo = "Descripción breve" → provided implicitly via benefits/persona/lexicon. Goal: conversion with specificity and personalization.
-- Lexicon & Tone: rows where tipo = "Léxico editorial" → provided as lexico (string). Use those exact terms and style cues.
-- Brand: if the table contains tipo = "marca", it may be present inside head_phrases or attributes/variations strings.
-  If a brand-like value is present in your inputs, prepend it to the Title as Brand.
-  If not present, do not invent a brand.
+2. Emotion as the Driver
+- Purchases are driven by emotions first, logic second.
+- Anchor copy to 1 primary and 2–3 secondary emotions.
+- Core emotions: Status & Recognition; Financial Security; Time & Efficiency;
+  Relationship & Connection; Confidence & Competence; Growth & Achievement;
+  Safety & Peace of Mind; Pleasure & Enjoyment.
+- Common fears to neutralize: financial loss, wasted time, embarrassment,
+  missing out (FOMO), overwhelm, making a wrong choice.
 
-FORMATS TO PRODUCE:
-- Title (150–200 chars): follow exactly → Brand (if available) + Product Name + Product Type + 1–2 Key Feature(s) + Use Case + Size/Quantity/Color.
-  Keep it tight and non-redundant.
-- Bullets (5 × 180–240 chars): each bullet MUST start with an ALL-CAPS HEADER followed by a colon, then the sentence.
-  Pattern: HEADER: concise sentence that combines Attribute + Benefit + Use case. Use sensory/experiential language when appropriate.
-- Description (1600–2000 chars): plain text; separate paragraphs with <br><br>. Blend story with benefits and objections for the avatar.
-- Backend (243–249 bytes without spaces): space-separated tokens; no commas/HTML; do not repeat any surface words; may include typos/other languages; enforce singular OR plural (not both).
+3. Message Structure
+- Hook → Emotion → Benefit → Proof/Attribute → Trust.
+- Crocodile Brain (clarity, no spam/confusion).
+- Midbrain (emotion, sensory examples, relatable scenarios).
+- Neocortex (logic: attributes, data, justification).
+
+4. Editorial Style
+- Conversational, direct, simple language.
+- Use action verbs, short sentences, sensory details when useful.
+- Avoid jargon, fluff, or subjective claims.
+- No hype (“best”, “#1”, “top quality”). Stay precise and benefit-driven.
+
+5. Amazon Context
+- Lead with benefits, reinforce with attributes.
+- Mix logic + emotion consistently.
+- Acknowledge objections and pivot to resolution.
+- Customer-centric voice: use “you/your” more than “we/our”.
+
+Always integrate these editorial principles while respecting Amazon Guidelines.
 """
 
-# ============================================================
-# Prompt maestro (genera Title + Bullets + Description + Backend en 1 paso)
-# ============================================================
+# -----------------------------
+# Master Prompt
+# -----------------------------
 
 
 def prompt_master_json(
@@ -118,10 +121,8 @@ def prompt_master_json(
     lexico: str,
 ) -> str:
     """
-    Master prompt que fija:
-    - Cumplimiento de políticas de Amazon (AMAZON_GUIDELINES_BRIEF).
-    - Marco editorial (EDITORIAL_BRIEF).
-    - Generación en un solo paso: title, bullets, description y search_terms.
+    One-shot master prompt. Embeds Amazon Guidelines + Editorial Brief,
+    then adds table-derived inputs.
     """
 
     return f"""{AMAZON_GUIDELINES_BRIEF}
