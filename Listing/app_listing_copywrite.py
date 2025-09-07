@@ -1,22 +1,20 @@
 # listing/app_listing_copywrite.py
-# UI for a SINGLE BUTTON that generates the whole listing with AI.
-# Shows lengths/bytes and basic compliance notes.
+# UI: un botón → una llamada IA → títulos (desktop/móvil por variación), 5 bullets, descripción, backend.
+# Muestra conteos y un breve reporte de compliance.
 
 import json
 import streamlit as st
 import pandas as pd
 
 from listing.funcional_listing_copywrite import (
-    lafuncionqueejecuta_listing_copywrite,
+    generate_listing_copy,
     compliance_report,
 )
 
 
 def _get_inputs_df() -> pd.DataFrame:
     df = st.session_state.get("inputs_para_listing", pd.DataFrame())
-    if not isinstance(df, pd.DataFrame):
-        return pd.DataFrame()
-    return df
+    return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
 
 
 def _no_space_bytes_len(s: str) -> int:
@@ -31,26 +29,25 @@ def mostrar_listing_copywrite(excel_data=None):
     df_inputs = _get_inputs_df()
     if df_inputs.empty:
         st.warning(
-            "No inputs available. Build them in **Mercado → Cliente / Tabla** first.")
-        with st.expander("Expected inputs (debug)"):
-            st.text("Rows like: Marca, Descripción breve, Buyer persona, Beneficio valorado/Ventaja,\n"
-                    "Atributo, Variación, Emoción, Léxico editorial, SEO semántico (Core/Cluster).")
+            "No hay inputs. Ve a Mercado → Cliente/Tabla para construir 'inputs_para_listing'.")
+        with st.expander("Ver inputs esperados", expanded=False):
+            st.markdown(
+                "- Filas: **Marca**, **Descripción breve**, **Buyer persona**, "
+                "**Beneficio/Beneficio valorado/Ventaja**, **Emoción**, "
+                "**Atributo**, **Variación**, **Léxico editorial**, **SEO semántico/Core**."
+            )
         return
 
     with st.expander("View source inputs (debug)", expanded=False):
         st.dataframe(df_inputs, use_container_width=True)
 
     st.divider()
+    model = st.selectbox("Model", ["gpt-4o-mini"],
+                         index=0, help="Lowest-cost for drafting.")
 
-    model = st.selectbox("Model", options=[
-                         "gpt-4o-mini"], index=0, help="Cheapest suitable OpenAI chat model.")
-
-    if st.button("Generate full listing (AI)", type="primary", use_container_width=True):
+    if st.button("Generate listing", type="primary", use_container_width=True):
         try:
-            draft = lafuncionqueejecuta_listing_copywrite(
-                inputs_df=df_inputs,
-                model=model,
-            )
+            draft = generate_listing_copy(df_inputs, model=model)
             st.session_state["draft_listing"] = draft
             st.success("Listing generated.")
         except Exception as e:
@@ -59,62 +56,46 @@ def mostrar_listing_copywrite(excel_data=None):
 
     draft = st.session_state.get("draft_listing", {})
     if not draft:
-        st.info("No draft yet. Click the button above to generate.")
+        st.info("Press **Generate listing**.")
         return
 
-    # Render
+    # Titles
     st.markdown("### Titles (per variation)")
-    for t in draft.get("titles", []) or []:
-        st.write(f"**Variation:** {t.get('variation','')}")
+    for t in draft.get("titles", []):
+        st.markdown(
+            f"**Variation:** {t.get('variation','(none)') or '(none)'}")
         desk = t.get("desktop", "")
-        mob = t.get("mobile", "")
+        mobi = t.get("mobile", "")
         st.code(desk)
         st.caption(f"Desktop length: {len(desk)} chars")
-        st.code(mob)
-        st.caption(f"Mobile length: {len(mob)} chars")
-        st.divider()
+        st.code(mobi)
+        st.caption(f"Mobile length: {len(mobi)} chars")
 
+    # Bullets
     st.markdown("### Bullets (5)")
     bullets = draft.get("bullets", []) or []
-    for i, b in enumerate(bullets, 1):
+    for i, b in enumerate(bullets[:5], 1):
         st.write(f"{i}. {b}")
         st.caption(f"Length: {len(b)} chars")
 
+    # Description
     st.markdown("### Description")
-    desc = draft.get("description", "") or ""
-    st.write(desc)
+    desc = draft.get("description", "")
+    st.write(desc, unsafe_allow_html=True)
     st.caption(f"Length: {len(desc)} chars")
 
+    # Backend
     st.markdown("### Backend Search Terms")
-    backend = draft.get("search_terms", "") or ""
+    backend = draft.get("search_terms", "")
     st.code(backend)
     st.caption(f"Bytes (no spaces): {_no_space_bytes_len(backend)}")
 
-    # Compliance snapshot
-    rep = compliance_report(draft)
-    if rep.get("ok"):
-        st.success("Basic compliance checks passed.")
-    else:
-        st.warning("Issues found:")
-        for issue in rep.get("issues", []):
-            st.write(f"- {issue}")
-
-    # Export
+    # Compliance report
     st.divider()
-    col1, col2 = st.columns(2)
-    with col1:
-        st.download_button(
-            "⬇️ Download JSON",
-            data=json.dumps(draft, ensure_ascii=False, indent=2),
-            file_name="listing_draft_en.json",
-            mime="application/json",
-            use_container_width=True,
-        )
-    with col2:
-        st.download_button(
-            "⬇️ Backend Search Terms (.txt)",
-            data=draft.get("search_terms", ""),
-            file_name="backend_search_terms.txt",
-            mime="text/plain",
-            use_container_width=True,
-        )
+    rep = compliance_report(draft)
+    if rep["issues"]:
+        st.error("Issues found:")
+        for it in rep["issues"]:
+            st.write(f"- {it}")
+    else:
+        st.success("All checks passed.")
