@@ -1,12 +1,12 @@
 # listing/prompts_listing_copywrite.py
 # Master prompt (EN) for generating the entire Amazon listing in one call:
 # Titles (desktop & mobile per variation), Bullets, Description, Backend search terms.
-# All briefs below are OPERATIVE (they are part of the actual prompt).
+# All briefs below are OPERATIVE (they become part of the actual prompt).
 
 from typing import List, Optional
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 1) AMAZON GUIDELINES – GENERAL CONTRACT (hard rules)
+# AMAZON GUIDELINES – GENERAL CONTRACT (hard rules)
 # ─────────────────────────────────────────────────────────────────────────────
 AMAZON_GUIDELINES_BRIEF = r"""
 AMAZON LISTING – GLOBAL GUIDELINES (HARD RULES)
@@ -36,7 +36,7 @@ BULLET POINTS
 - 5 bullets required for our workflow.
 - Each bullet: begin with ALL-CAPS HEADER then colon, followed by sentence fragment.
 - >10 and <255 characters per Amazon; our workflow sets a narrower range below.
-- Use semicolons to separate phrases within a bullet.
+- Use semicolons to separate phrases within a bullet when needed.
 - No ending punctuation (no final period).
 - Each bullet must be unique (no duplication across bullets).
 
@@ -54,7 +54,7 @@ BACKEND SEARCH TERMS (“Generic keywords”)
 """
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 2) EDITORIAL BRIEF – BEHAVIORAL RULES (mapping from the structured table)
+# EDITORIAL BRIEF – BEHAVIORAL RULES (mapping from the structured table)
 # ─────────────────────────────────────────────────────────────────────────────
 EDITORIAL_BRIEF = r"""
 EDITORIAL BRIEF – TABLE-DRIVEN BEHAVIOR
@@ -79,9 +79,8 @@ PRIORITIES
 """
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3) ELEMENT CONTRACTS – SPECIFIC RULES PER OUTPUT
+# ELEMENT CONTRACTS – SPECIFIC RULES PER OUTPUT
 # ─────────────────────────────────────────────────────────────────────────────
-
 TITLE_CONTRACT = r"""
 TITLE CONTRACT (DESKTOP & MOBILE, PER VARIATION)
 
@@ -171,7 +170,6 @@ EXCLUSIONS
 - No brand names, ASINs, competitor names.
 - No subjective words (“best”, “cheapest”, etc.), no temporary terms (“new”, “on sale”).
 - No punctuation; no articles/prepositions/stop-words (a, an, and, by, for, of, the, with).
-- No duplication with surface copy is RECOMMENDED; prioritize distinct, discoverable tokens. (If minor overlap is inevitable, keep it minimal and useful.)
 - Use either singular OR plural for each token family (not both).
 
 OUTPUT
@@ -179,27 +177,33 @@ OUTPUT
 """
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4) PROMPT MASTER – SINGLE CALL, RETURNS FULL LISTING JSON
+# PROMPT MASTER – SINGLE CALL, RETURNS FULL LISTING JSON
 # ─────────────────────────────────────────────────────────────────────────────
 
 
 def prompt_master_json(
-    head_phrases: List[str],
-    core_tokens: List[str],
-    attributes: List[str],
-    variations: List[str],
-    benefits: List[str],
-    emotions: List[str],
-    buyer_persona: str,
-    lexico: str,
-    brand: Optional[str] = None,  # <-- ADDED to match callers that pass brand=
+    head_phrases: Optional[List[str]] = None,
+    core_tokens: Optional[List[str]] = None,
+    attributes: Optional[List[str]] = None,
+    variations: Optional[List[str]] = None,
+    benefits: Optional[List[str]] = None,
+    emotions: Optional[List[str]] = None,
+    buyer_persona: str = "",
+    lexico: str = "",
+    brand: Optional[str] = None,
 ) -> str:
     """
     Build the operative prompt for a single-run listing generation.
-    Inputs are projections of the consolidated table.
-    'brand' is optional; if provided, it is used only as a guardrail (never invent a brand).
+    All params are optional (defaults avoid positional-argument errors).
     """
-
+    head_phrases = list(filter(None, (head_phrases or [])))
+    core_tokens = list(filter(None, (core_tokens or [])))
+    attributes = list(filter(None, (attributes or [])))
+    variations = list(filter(None, (variations or [])))
+    benefits = list(filter(None, (benefits or [])))
+    emotions = list(filter(None, (emotions or [])))
+    buyer_persona = str(buyer_persona or "")
+    lexico = str(lexico or "")
     brand_note = f"(explicit brand present: {brand})" if (
         brand and str(brand).strip()) else "(no explicit brand provided)"
 
@@ -235,7 +239,6 @@ EXPECTED JSON SCHEMA (return EXACTLY these fields):
 {{
   "titles": [
     {{"variation": "<variation value>", "desktop": "<150–180 chars>", "mobile": "<75–80 chars>"}}
-    // ... one object per variation
   ],
   "bullets": [
     "<130–180 chars bullet with ALL-CAPS HEADER: sentence fragment; no final period>",
@@ -257,9 +260,7 @@ Return ONLY the JSON object. No explanations.
 """
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Backward-compat alias (so existing imports don't break)
-# ─────────────────────────────────────────────────────────────────────────────
+# Backward-compat alias
 PROMPT_MASTER_JSON = prompt_master_json
 
 __all__ = [

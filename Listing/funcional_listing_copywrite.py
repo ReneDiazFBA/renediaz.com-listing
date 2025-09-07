@@ -1,291 +1,285 @@
 # listing/funcional_listing_copywrite.py
-# Build inputs from the unified table, call AI once, validate compliance.
+# Single-button generation pipeline: extracts inputs from the consolidated table,
+# builds the prompt, calls OpenAI (cheap model), validates, and returns a dict.
 
-import os
 import json
-import re
+import os
 from typing import Dict, List, Any
 
 import pandas as pd
 
 from listing.prompts_listing_copywrite import PROMPT_MASTER_JSON
 
-# ─────────────────────────────
-# Utilities
-# ─────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers to extract inputs from the unified table (Tipo/Contenido/Etiqueta/Fuente)
+# ─────────────────────────────────────────────────────────────────────────────
 
 
-def _no_space_bytes_len(s: str) -> int:
-    return len((s or "").replace(" ", "").encode("utf-8"))
+def _norm(s: Any) -> str:
+    return str(s or "").strip()
 
 
-def _clean_list(xs: List[Any]) -> List[str]:
-    out = []
-    for x in xs or []:
-        if x is None:
-            continue
-        s = str(x).strip()
-        if s:
-            out.append(s)
-    return out
-
-
-def _unique_keep_order(xs: List[str]) -> List[str]:
-    seen = set()
-    out = []
-    for x in xs:
-        if x not in seen:
-            seen.add(x)
-            out.append(x)
-    return out
-
-
-def _lower_ascii(s: str) -> str:
+def _first(series: pd.Series) -> str:
     try:
-        return s.lower()
+        val = series.dropna().astype(str)
+        return val.iloc[0].strip() if not val.empty else ""
     except Exception:
-        return s
-
-# ─────────────────────────────
-# 1) Build inputs from unified DF (Tipo, Contenido, Etiqueta, Fuente)
-# ─────────────────────────────
+        return ""
 
 
-def build_inputs_from_df(df: pd.DataFrame) -> Dict[str, Any]:
-    """
-    Extracts the minimal, table-driven projections we need for copywriting.
-    - brand: first row Tipo="Marca"
-    - core_tokens: Tipo="SEO semántico" & Etiqueta contains "Core"
-    - attributes: Tipo="Atributo" → use Contenido (value only)
-    - variations: Tipo="Variación" → Contenido
-    - benefits: Tipo in {"Beneficio", "Beneficio valorado", "Ventaja"}
-    - emotions: Tipo="Emoción" → Contenido
-    - buyer_persona: Tipo="Buyer persona" (first)
-    - lexico: Tipo="Léxico editorial" (first, raw string)
-    """
-    if not isinstance(df, pd.DataFrame) or df.empty:
-        return {
-            "brand": "",
-            "core_tokens": [],
-            "attributes": [],
-            "variations": [],
-            "benefits": [],
-            "emotions": [],
-            "buyer_persona": "",
-            "lexico": "",
-        }
+def _unique(series: pd.Series) -> List[str]:
+    try:
+        vals = series.dropna().astype(str).str.strip()
+        vals = [v for v in vals if v]
+        # preserve order while dedup
+        seen = set()
+        out = []
+        for v in vals:
+            if v not in seen:
+                seen.add(v)
+                out.append(v)
+        return out
+    except Exception:
+        return []
 
-    def tipo_is(df, name: str) -> pd.Series:
-        return df["Tipo"].astype(str).str.strip().str.lower().eq(name.lower())
 
-    brand = ""
-    _brand_rows = df[tipo_is(df, "marca")
-                     ] if "Tipo" in df.columns else pd.DataFrame()
-    if not _brand_rows.empty:
-        brand = str(_brand_rows.iloc[0]["Contenido"]).strip()
+def _col_exists(df: pd.DataFrame, name: str) -> bool:
+    return any(str(c).strip().lower() == name.lower() for c in df.columns)
 
+
+def _tipo_equals(df: pd.DataFrame, tipo: str) -> pd.DataFrame:
+    if not _col_exists(df, "Tipo"):
+        return df.iloc[0:0]
+    return df[df["Tipo"].astype(str).str.lower() == tipo.lower()]
+
+
+def _tipo_contains(df: pd.DataFrame, needle: str) -> pd.DataFrame:
+    if not _col_exists(df, "Tipo"):
+        return df.iloc[0:0]
+    return df[df["Tipo"].astype(str).str.contains(needle, case=False, na=False)]
+
+
+def _etiqueta_contains(df: pd.DataFrame, needle: str) -> pd.DataFrame:
+    if not _col_exists(df, "Etiqueta"):
+        return df.iloc[0:0]
+    return df[df["Etiqueta"].astype(str).str.contains(needle, case=False, na=False)]
+
+
+def _contenido_list(df: pd.DataFrame) -> List[str]:
+    if not _col_exists(df, "Contenido"):
+        return []
+    return _unique(df["Contenido"])
+
+
+def extract_inputs_from_table(inputs_df: pd.DataFrame) -> Dict[str, Any]:
+    df = inputs_df.copy()
+
+    # Brand
+    brand = _first(_tipo_equals(df, "Marca")["Contenido"]) if not _tipo_equals(
+        df, "Marca").empty else ""
+
+    # Variations (values only)
+    df_var = df[df["Tipo"].astype(str).str.contains(
+        r"variaci", case=False, na=False)]
+    variations = _contenido_list(df_var)
+
+    # Attributes (values only)
+    df_attr = _tipo_equals(df, "Atributo")
+    attributes = _contenido_list(df_attr)
+
+    # Core tokens (robust against v3.9/v3.10)
+    # v3.10 → Tipo = "SEO semántico", Etiqueta includes "Core"
+    # legacy → Tipo may be "Token Semántico (Core)" or similar
     core_tokens = []
-    if {"Tipo", "Etiqueta", "Contenido"}.issubset(df.columns):
-        core_mask = (df["Tipo"].astype(str).str.lower().str.strip() == "seo semántico") | \
-                    (df["Tipo"].astype(str).str.lower(
-                    ).str.strip() == "seo semantico")
-        core_mask = core_mask & df["Etiqueta"].astype(
-            str).str.contains(r"\bcore\b", case=False, na=False)
-        core_tokens = _clean_list(
-            df.loc[core_mask, "Contenido"].astype(str).tolist())
+    df_core_a = _tipo_equals(df, "SEO semántico")
+    if not df_core_a.empty:
+        core_tokens = _contenido_list(_etiqueta_contains(df_core_a, "core"))
+    if not core_tokens:
+        df_core_b = _tipo_contains(df, "token semántico")
+        core_tokens = _contenido_list(_etiqueta_contains(df_core_b, "core"))
 
-    attributes = []
-    if "Tipo" in df.columns and "Contenido" in df.columns:
-        attr_mask = df["Tipo"].astype(
-            str).str.lower().str.strip().eq("atributo")
-        attributes = _clean_list(
-            df.loc[attr_mask, "Contenido"].astype(str).tolist())
-
-    variations = []
-    if "Tipo" in df.columns and "Contenido" in df.columns:
-        var_mask = df["Tipo"].astype(str).str.lower().str.strip().eq("variación") | \
-            df["Tipo"].astype(str).str.lower().str.strip().eq("variacion")
-        variations = _clean_list(
-            df.loc[var_mask, "Contenido"].astype(str).tolist())
-
+    # Benefits (support both "Beneficio valorado", "Ventaja", legacy "Beneficio")
     benefits = []
-    if "Tipo" in df.columns and "Contenido" in df.columns:
-        ben_mask = df["Tipo"].astype(str).str.lower().str.strip().isin(
-            ["beneficio", "beneficio valorado", "ventaja"]
-        )
-        benefits = _clean_list(
-            df.loc[ben_mask, "Contenido"].astype(str).tolist())
+    for t in ["Beneficio valorado", "Ventaja", "Beneficio"]:
+        benefits.extend(_contenido_list(_tipo_equals(df, t)))
+    # dedup preserving order
+    seen = set()
+    benefits_dedup = []
+    for b in benefits:
+        if b not in seen:
+            seen.add(b)
+            benefits_dedup.append(b)
+    benefits = benefits_dedup
 
-    emotions = []
-    if "Tipo" in df.columns and "Contenido" in df.columns:
-        emo_mask = df["Tipo"].astype(str).str.lower().str.strip().eq("emoción") | \
-            df["Tipo"].astype(str).str.lower().str.strip().eq("emocion")
-        emotions = _clean_list(
-            df.loc[emo_mask, "Contenido"].astype(str).tolist())
+    # Emotions
+    emotions = _contenido_list(_tipo_equals(df, "Emoción"))
 
-    buyer_persona = ""
-    bp_rows = df[df["Tipo"].astype(str).str.lower().str.strip().eq(
-        "buyer persona")] if "Tipo" in df.columns else pd.DataFrame()
-    if not bp_rows.empty:
-        buyer_persona = str(bp_rows.iloc[0]["Contenido"]).strip()
+    # Buyer persona
+    buyer_persona = _first(_tipo_equals(df, "Buyer persona")[
+                           "Contenido"]) if not _tipo_equals(df, "Buyer persona").empty else ""
 
-    lexico = ""
-    lex_rows = df[df["Tipo"].astype(str).str.lower().str.strip().eq(
-        "léxico editorial")] if "Tipo" in df.columns else pd.DataFrame()
-    if lex_rows.empty and "Tipo" in df.columns:
-        lex_rows = df[df["Tipo"].astype(
-            str).str.lower().str.strip().eq("lexico editorial")]
-    if not lex_rows.empty:
-        lexico = str(lex_rows.iloc[0]["Contenido"]).strip()
+    # Editorial lexicon (concatenate if multiple rows)
+    lexico_rows = _tipo_equals(df, "Léxico editorial")
+    lexico = " ".join(_contenido_list(lexico_rows))
 
-    # Deduplicate while keeping order
-    core_tokens = _unique_keep_order(core_tokens)
-    attributes = _unique_keep_order(attributes)
-    variations = _unique_keep_order(variations)
-    benefits = _unique_keep_order(benefits)
-    emotions = _unique_keep_order(emotions)
+    # Head phrases = brand + a few core tokens (seed headline cues). Never invent.
+    head_phrases = []
+    if brand:
+        head_phrases.append(brand)
+    head_phrases.extend(core_tokens[:8])  # cap a few
 
-    return {
-        "brand": brand,
-        "core_tokens": core_tokens,
-        "attributes": attributes,
-        "variations": variations,
-        "benefits": benefits,
-        "emotions": emotions,
-        "buyer_persona": buyer_persona,
-        "lexico": lexico,
-    }
-
-# ─────────────────────────────
-# 2) Call AI once (gpt-4o-mini). Return JSON.
-# ─────────────────────────────
-
-
-def generate_listing_json(inputs: Dict[str, Any], model: str = "gpt-4o-mini") -> Dict[str, Any]:
-    """
-    Single-shot generation: titles (per variation, desktop/mobile), 5 bullets, description, backend.
-    Requires OPENAI_API_KEY in environment/st.secrets. No fallback text here by design.
-    """
-    prompt = PROMPT_MASTER_JSON(
-        brand=inputs.get("brand", ""),
-        core_tokens=inputs.get("core_tokens", []),
-        attributes=inputs.get("attributes", []),
-        variations=inputs.get("variations", []),
-        benefits=inputs.get("benefits", []),
-        emotions=inputs.get("emotions", []),
-        buyer_persona=inputs.get("buyer_persona", ""),
-        lexico=inputs.get("lexico", ""),
+    return dict(
+        brand=brand,
+        variations=variations,
+        attributes=attributes,
+        core_tokens=core_tokens,
+        benefits=benefits,
+        emotions=emotions,
+        buyer_persona=buyer_persona,
+        lexico=lexico,
+        head_phrases=head_phrases,
     )
 
-    # Import lazily so environments without openai don't fail on import.
-    try:
-        from openai import OpenAI
-    except Exception as e:
-        raise RuntimeError(
-            "OpenAI SDK not available. Install 'openai' >= 1.0.0") from e
+# ─────────────────────────────────────────────────────────────────────────────
+# OpenAI call (cheap model) – robust to both old/new SDKs
+# ─────────────────────────────────────────────────────────────────────────────
 
-    api_key = os.getenv("OPENAI_API_KEY", "")
+
+def _call_openai_json(prompt: str, model: str = "gpt-4o-mini") -> Dict[str, Any]:
+    # Ensure API key
+    api_key = os.getenv("OPENAI_API_KEY") or ""
     if not api_key:
         # Streamlit secrets (optional)
         try:
-            import streamlit as st
-            api_key = st.secrets.get("OPENAI_API_KEY", "")
+            import streamlit as st  # type: ignore
+            api_key = st.secrets.get("OPENAI_API_KEY", "")  # type: ignore
+            if api_key:
+                os.environ["OPENAI_API_KEY"] = api_key
         except Exception:
             pass
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY not found.")
-
-    client = OpenAI(api_key=api_key)
-
-    resp = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": "You are a precise Amazon listing copywriter. Always return strict JSON."},
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.2,
-        response_format={"type": "json_object"},
-    )
-
-    text = resp.choices[0].message.content
-    try:
-        data = json.loads(text)
-    except Exception as e:
+    if not os.getenv("OPENAI_API_KEY"):
         raise RuntimeError(
-            f"Model did not return valid JSON. Raw: {text[:400]}") from e
+            "OPENAI_API_KEY not found. Set it in env or st.secrets.")
 
-    # Minimal shape guard
-    for k in ("titles", "bullets", "description", "search_terms"):
-        if k not in data:
-            raise RuntimeError(f"Missing '{k}' in model output.")
-    return data
+    # Try new SDK first
+    try:
+        from openai import OpenAI  # type: ignore
+        client = OpenAI()
+        resp = client.chat.completions.create(
+            model=model,
+            response_format={"type": "json_object"},
+            temperature=0.4,
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that only returns valid JSON."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        text = resp.choices[0].message.content or "{}"
+        return json.loads(text)
+    except Exception:
+        # Fallback to legacy SDK signature
+        try:
+            import openai  # type: ignore
+            openai.api_key = os.getenv("OPENAI_API_KEY")
+            resp = openai.ChatCompletion.create(
+                model=model,
+                temperature=0.4,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that only returns valid JSON."},
+                    {"role": "user", "content": prompt},
+                ],
+            )
+            text = resp["choices"][0]["message"]["content"] or "{}"
+            return json.loads(text)
+        except Exception as e2:
+            raise RuntimeError(f"OpenAI call failed: {e2}")
 
-# ─────────────────────────────
-# 3) Compliance checks (hard constraints)
-# ─────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Compliance checks (lightweight)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _bytes_wo_spaces(s: str) -> int:
+    return len((s or "").replace(" ", "").encode("utf-8"))
 
 
 def compliance_report(draft: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Returns pass/fail + notes for: titles length, bullets count/length/format, description length, backend bytes/format.
-    """
-    report = {"ok": True, "issues": []}
+    issues = []
 
     # Titles
-    titles = draft.get("titles", [])
-    if not isinstance(titles, list) or not titles:
-        report["ok"] = False
-        report["issues"].append("No titles array returned.")
-    else:
-        for i, t in enumerate(titles, 1):
-            desktop = (t or {}).get("desktop", "")
-            mobile = (t or {}).get("mobile", "")
-            if not (150 <= len(desktop) <= 180):
-                report["ok"] = False
-                report["issues"].append(
-                    f"Title #{i} desktop length={len(desktop)} (must be 150–180).")
-            if not (75 <= len(mobile) <= 80):
-                report["ok"] = False
-                report["issues"].append(
-                    f"Title #{i} mobile length={len(mobile)} (must be 75–80).")
+    for t in draft.get("titles", []) or []:
+        desk = t.get("desktop", "")
+        mob = t.get("mobile", "")
+        if not (150 <= len(desk) <= 180):
+            issues.append(
+                f"Desktop title len out of range ({len(desk)}): {desk[:60]}…")
+        if not (75 <= len(mob) <= 80):
+            issues.append(
+                f"Mobile title len out of range ({len(mob)}): {mob[:60]}…")
 
     # Bullets
-    bullets = draft.get("bullets", [])
+    bullets = draft.get("bullets", []) or []
     if len(bullets) != 5:
-        report["ok"] = False
-        report["issues"].append(f"Bullets count={len(bullets)} (must be 5).")
-    for j, b in enumerate(bullets, 1):
-        L = len(b or "")
-        if not (130 <= L <= 180):
-            report["ok"] = False
-            report["issues"].append(
-                f"Bullet {j} length={L} (must be 130–180).")
-        if not re.match(r"^[A-Z0-9][A-Z0-9\s&\-\/]+:\s", b or ""):
-            report["ok"] = False
-            report["issues"].append(
-                f"Bullet {j} must start with ALL-CAPS HEADER followed by ': '.")
+        issues.append(f"Bullets count must be 5 (got {len(bullets)}).")
+    for i, b in enumerate(bullets, 1):
+        if not (130 <= len(b) <= 180):
+            issues.append(f"Bullet {i} len out of range ({len(b)}).")
+        if ":" not in b.split(" ", 1)[0]:
+            issues.append(
+                f"Bullet {i} must start with ALL-CAPS HEADER and colon.")
+        if b.endswith("."):
+            issues.append(f"Bullet {i} should not end with a period.")
 
     # Description
-    desc = draft.get("description", "")
+    desc = draft.get("description", "") or ""
     if not (1500 <= len(desc) <= 1800):
-        report["ok"] = False
-        report["issues"].append(
-            f"Description length={len(desc)} (must be 1500–1800).")
-    if "<br><br>" not in (desc or ""):
-        report["issues"].append(
-            "Description should use <br><br> between paragraphs (advisory).")
+        issues.append(f"Description len out of range ({len(desc)}).")
+    if "<br><br>" not in desc:
+        issues.append("Description must include <br><br> paragraph breaks.")
 
     # Backend
     backend = draft.get("search_terms", "") or ""
-    bytes_no_space = _no_space_bytes_len(backend)
-    if not (243 <= bytes_no_space <= 249):
-        report["ok"] = False
-        report["issues"].append(
-            f"Search terms bytes(no spaces)={bytes_no_space} (must be 243–249).")
-    if backend.strip() != backend.strip().lower():
-        report["issues"].append("Search terms should be lowercase.")
-    if re.search(r"[,;:\-_/\\.]", backend):
-        report["issues"].append(
-            "Search terms should not contain punctuation; use spaces only.")
+    byt = _bytes_wo_spaces(backend)
+    if not (243 <= byt <= 249):
+        issues.append(f"Backend bytes (no spaces) out of range: {byt}.")
 
-    return report
+    return {"ok": len(issues) == 0, "issues": issues}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Main entry for the app
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def lafuncionqueejecuta_listing_copywrite(
+    inputs_df: pd.DataFrame,
+    model: str = "gpt-4o-mini",
+) -> Dict[str, Any]:
+    """
+    Extracts inputs → builds prompt → calls OpenAI → returns JSON dict.
+    No local fallbacks to fake content (to avoid confusion/cost surprises).
+    """
+    if not isinstance(inputs_df, pd.DataFrame) or inputs_df.empty:
+        raise ValueError("inputs_df is empty.")
+
+    inp = extract_inputs_from_table(inputs_df)
+
+    prompt = PROMPT_MASTER_JSON(
+        head_phrases=inp.get("head_phrases", []),
+        core_tokens=inp.get("core_tokens", []),
+        attributes=inp.get("attributes", []),
+        variations=inp.get("variations", []),
+        benefits=inp.get("benefits", []),
+        emotions=inp.get("emotions", []),
+        buyer_persona=inp.get("buyer_persona", ""),
+        lexico=inp.get("lexico", ""),
+        brand=inp.get("brand", ""),
+    )
+
+    draft = _call_openai_json(prompt, model=model)
+
+    # Optional: minimal structural validation (fail fast if schema is broken)
+    for key in ("titles", "bullets", "description", "search_terms"):
+        if key not in draft:
+            raise RuntimeError(f"Model did not return required key: {key}")
+
+    return draft
