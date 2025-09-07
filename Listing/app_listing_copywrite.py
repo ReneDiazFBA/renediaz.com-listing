@@ -1,6 +1,4 @@
 # listing/app_listing_copywrite.py
-# UI for the "Copywriting" tab: one button to generate the full EN listing
-# + Quality & Compliance panel with auto-fix toggles.
 
 import json
 import streamlit as st
@@ -21,7 +19,7 @@ def _get_inputs_df() -> pd.DataFrame:
 
 def mostrar_listing_copywrite(excel_data=None):
     st.subheader("Copywriting (EN)")
-    st.caption("Generate Titles (desktop+mobile per variation), 5 Bullets, Description and Backend in one shot. Includes compliance checks and auto-fixes.")
+    st.caption("Generate Titles (desktop+mobile per variation), 5 Bullets, Description (1500–1800, multi-paragraph) and Backend in one shot, with compliance checks and auto-fixes.")
 
     df_inputs = _get_inputs_df()
     if df_inputs.empty:
@@ -59,7 +57,7 @@ def mostrar_listing_copywrite(excel_data=None):
     st.markdown("### Quality & Compliance")
     comp = draft.get("_compliance") or compliance_report(draft)
 
-    # Titles table of issues
+    # Titles
     if comp.get("titles"):
         for t in comp["titles"]:
             issues = t.get("issues", [])
@@ -69,7 +67,8 @@ def mostrar_listing_copywrite(excel_data=None):
             if issues:
                 for it in issues:
                     st.caption(f"• {it}")
-    # Bullets issues
+
+    # Bullets
     if comp.get("bullets"):
         if len(comp["bullets"]) == 0:
             st.write("🟢 **Bullets:** OK")
@@ -77,7 +76,17 @@ def mostrar_listing_copywrite(excel_data=None):
             st.write("🟠 **Bullets:**")
             for it in comp["bullets"]:
                 st.caption(f"• {it}")
-    # Backend issues
+
+    # Description
+    if comp.get("description"):
+        if len(comp["description"]) == 0:
+            st.write("🟢 **Description:** OK")
+        else:
+            st.write("🟠 **Description:**")
+            for it in comp["description"]:
+                st.caption(f"• {it}")
+
+    # Backend
     if comp.get("backend"):
         if len(comp["backend"]) == 0:
             st.write("🟢 **Backend:** OK")
@@ -90,24 +99,30 @@ def mostrar_listing_copywrite(excel_data=None):
 
     # Auto-fix toggles
     st.markdown("#### Auto-fix")
-    c1, c2 = st.columns(2)
+    c1, c2, c3 = st.columns(3)
     with c1:
-        fix_titles = st.toggle("Auto-trim titles to limits", value=True,
+        fix_titles = st.toggle("Auto-trim titles", value=True,
                                help="Trims desktop (>180) and mobile (>80) at safe boundaries.")
     with c2:
-        fix_backend = st.toggle("Auto-trim backend to 243–249 bytes", value=True,
-                                help="Removes surface-duplicate tokens and trims from the end to fit byte window.")
+        fix_backend = st.toggle("Auto-trim backend", value=True,
+                                help="Removes surface-duplicate tokens and trims to 243–249 bytes.")
+    with c3:
+        fix_description = st.toggle("Normalize description", value=True,
+                                    help="Enforces 1500–1800 chars, multiple paragraphs, and <br><br> only.")
+
     if st.button("Apply fixes", use_container_width=True):
         fixed = apply_auto_fixes(
-            draft, fix_titles=fix_titles, fix_backend=fix_backend)
-        # Recompute compliance after fixes
-        fixed["_compliance"] = compliance_report(fixed)
+            draft,
+            fix_titles=fix_titles,
+            fix_backend=fix_backend,
+            fix_description=fix_description,
+        )
         st.session_state["draft_listing_full_en"] = fixed
         st.success("Fixes applied.")
 
     st.divider()
 
-    # ───────── Render Titles ─────────
+    # Titles
     st.markdown("### Titles (per variation)")
     titles = st.session_state["draft_listing_full_en"].get("titles", [])
     if titles:
@@ -124,7 +139,7 @@ def mostrar_listing_copywrite(excel_data=None):
     else:
         st.info("No titles returned.")
 
-    # ───────── Render Bullets ─────────
+    # Bullets
     st.markdown("### Bullets (5)")
     bullets = st.session_state["draft_listing_full_en"].get(
         "bullets", []) or []
@@ -132,7 +147,6 @@ def mostrar_listing_copywrite(excel_data=None):
         st.write(f"{i}. {b}")
         st.caption(f"Length: {len(b)} chars")
 
-    # Variation bullets (optional)
     vb = st.session_state["draft_listing_full_en"].get(
         "variation_bullets", {}) or {}
     if vb:
@@ -144,13 +158,13 @@ def mostrar_listing_copywrite(excel_data=None):
                         st.write(f"{i}. {b}")
                         st.caption(f"Length: {len(b)} chars")
 
-    # ───────── Render Description ─────────
+    # Description
     st.markdown("### Description")
     desc = st.session_state["draft_listing_full_en"].get("description", "")
-    st.write(desc, unsafe_allow_html=True)  # allows <br><br>
+    st.write(desc, unsafe_allow_html=True)
     st.caption(f"Length: {len(desc)} chars")
 
-    # ───────── Render Backend ─────────
+    # Backend
     st.markdown("### Backend Search Terms")
     backend = st.session_state["draft_listing_full_en"].get("search_terms", "")
     st.code(backend)

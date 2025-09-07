@@ -1,7 +1,6 @@
 # listing/prompts_listing_copywrite.py
 # All-in-one prompts for Title(s) + Bullets + Description + Backend (EN).
-# This prompt stack enforces Amazon guidelines + your editorial brief,
-# and adds specific contracts per section.
+# Amazon Guidelines brief + Editorial brief + section contracts.
 
 from typing import List
 
@@ -11,7 +10,7 @@ AMAZON LISTING GUIDELINES — GLOBAL
 General:
 - Write in ENGLISH.
 - Do not include promotional language (“free shipping”, “#1”, “best”), competitor mentions, links, emails, phone numbers.
-- No emojis or decorative symbols. Disallowed in titles: !, $, ?, _, {, }, ^, ¬, ¦ (unless part of the registered brand name in the brand field by Amazon).
+- No emojis or decorative symbols. Disallowed in titles: !, $, ?, _, {, }, ^, ¬, ¦ (unless part of the registered brand name in Amazon's brand field).
 - Use standard letters and numerals. No non-language ASCII like Æ, Œ, Ÿ, etc.
 - Use numerals for numbers (2 not "two"). Space between digit and measurement (e.g., 60 ml).
 - Avoid subjective, unverifiable performance or comparative claims. No awards unless substantiated elsewhere on the page.
@@ -19,7 +18,7 @@ General:
 Title (hard rules):
 - ≤ 200 characters (including spaces) as global max.
 - No promotional phrases. Do not repeat the same word more than twice (prepositions/articles/conjunctions are exceptions).
-- Prefer concise, scannable structure. Case style: Capitalize first letter of each main word (title case), not ALL CAPS.
+- Prefer concise, scannable structure. Title case (Capitalize Main Words), not ALL CAPS.
 - Allowed punctuation: hyphens (-), slashes (/), commas (,), ampersands (&), periods (.).
 - Put size/color/pack in child variations; parent titles should not duplicate variation values.
 
@@ -68,15 +67,16 @@ We generate TWO title lengths per variation:
 
 Construction (in order):
 Brand + Product Name (built ONLY from core tokens; no invented terms) + Product Type
-+ Key attribute values (not labels; values only, taken from prioritized attributes)
++ Key attribute values (values only, taken from prioritized attributes)
 + Variation (size/color/pack etc. — one title per variation with same base text)
+
 Separators:
 - Brand and Product Name/Product Type: space (no hyphen here)
 - Between blocks (product type ↔ attributes ↔ variation): " - "
 - Between multiple attributes: ", "
 
 Strict rules:
-- Do NOT duplicate a value as both attribute and variation; if a review-prioritized attribute is actually tagged as variation, place it ONLY as variation.
+- Do NOT duplicate a value as both attribute and variation; if a prioritized attribute is tagged as variation, place it ONLY as variation.
 - Use as many attribute VALUES as fit within the target length; prioritize by review importance.
 - Title case (Capitalize Main Words), avoid ALL CAPS.
 - Respect Amazon disallowed characters and duplication limits.
@@ -104,15 +104,19 @@ Output keys:
 "variation_bullets": { "<variation>": [str×5], ... }  # optional
 """
 
+# >>> UPDATED: Description contract to 1500–1800 chars with multiple paragraphs
 DESCRIPTION_BRIEF = """
 DESCRIPTION CONTRACT
 
-- Length: 1600–2000 characters (including spaces).
-- Plain text; separate paragraphs with <br><br>.
-- Blend narrative (pain → solution → outcomes) with concrete features/benefits.
-- Use persona cues and emotions from inputs; adopt editorial lexicon.
-- Must be consistent with Titles and Bullets; avoid redundancy.
-- Compliant: no promos, no competitors, no unverifiable claims.
+- Length: 1500–1800 characters (including spaces).
+- Plain text only; separate paragraphs with <br><br>. Use MULTIPLE paragraphs (never a single block).
+- Paragraphing guidance:
+  * 1st: problem/pain + stakes (persona language)
+  * 2nd: product solution + core features mapped to benefits
+  * 3rd: use cases + proof-like specifics (materials, sizes, fit, care) in natural language
+  * 4th (optional within limit): objection handling + reassurance (care, durability, compatibility, warranty info if applicable—no promos)
+- Integrate core SEO tokens and prioritized attribute VALUES naturally; avoid keyword stuffing.
+- Must be consistent with Titles and Bullets; no contradictions; no prohibited claims or competitor mentions.
 """
 
 BACKEND_BRIEF = """
@@ -172,7 +176,7 @@ Return ONLY valid JSON with this exact schema:
   "variation_bullets": {{
     "<variation>": ["<130–180>", "<130–180>", "<130–180>", "<130–180>", "<130–180>"]
   }},
-  "description": "<1600–2000 chars with <br><br> separators>",
+  "description": "<1500–1800 chars with <br><br> paragraph breaks (multiple paragraphs)>",
   "search_terms": "<243–249 bytes when removing spaces>"
 }}
 

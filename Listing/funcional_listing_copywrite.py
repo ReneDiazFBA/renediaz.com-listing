@@ -1,12 +1,9 @@
 # listing/funcional_listing_copywrite.py
-# Extracts inputs from the consolidated table and calls OpenAI once to generate:
-# Titles (desktop+mobile per variation), 5 bullets, description, backend (EN).
-# Adds Quality & Compliance checks + optional auto-fixes.
 
 import os
 import re
 import json
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Any
 import pandas as pd
 
 from listing.prompts_listing_copywrite import prompt_master_json_all
@@ -90,12 +87,10 @@ def check_title_item(item: Dict[str, str]) -> List[str]:
         issues.append(f"desktop length {len(d)} outside 150–180")
     if len(m) < 75 or len(m) > 80:
         issues.append(f"mobile length {len(m)} outside 75–80")
-    # disallowed chars
     if any(ch in DISALLOWED_TITLE_CHARS for ch in d):
         issues.append("desktop contains disallowed characters")
     if any(ch in DISALLOWED_TITLE_CHARS for ch in m):
         issues.append("mobile contains disallowed characters")
-    # duplicate word > 2 times (rough check)
 
     def _dup_chk(txt: str) -> bool:
         words = re.findall(r"[A-Za-z0-9]+", txt.lower())
@@ -110,18 +105,6 @@ def check_title_item(item: Dict[str, str]) -> List[str]:
     if _dup_chk(m):
         issues.append("mobile repeats a word more than twice")
     return issues
-
-
-def truncate_to_limit(text: str, max_len: int) -> str:
-    if len(text) <= max_len:
-        return text
-    cut = text[:max_len]
-    # try to cut at a safe boundary
-    for sep in [" - ", ", ", " "]:
-        idx = cut.rfind(sep)
-        if idx >= 50:  # avoid chopping too early
-            return cut[:idx].rstrip()
-    return cut.rstrip()
 
 
 HEADER_COLON_RE = re.compile(r"^[A-Z0-9\s\-&]+:\s")
@@ -139,7 +122,6 @@ def check_bullets(bullets: List[str]) -> List[str]:
         if not HEADER_COLON_RE.match(b or ""):
             issues.append(
                 f"bullet {i} must start with ALL-CAPS HEADER followed by colon")
-        # uniqueness (rough)
         norm = re.sub(r"\W+", " ", (b or "").lower()).strip()
         if norm in seen:
             issues.append(f"bullet {i} duplicates another bullet")
@@ -153,23 +135,21 @@ def collect_surface_words(payload: Dict[str, Any]) -> set:
         text += [t.get("desktop", ""), t.get("mobile", "")]
     text += payload.get("bullets", [])
     text.append(payload.get("description", ""))
-    bag = set(w for w in re.findall(r"[a-z0-9]+", " ".join(text).lower()))
-    return bag
+    return set(w for w in re.findall(r"[a-z0-9]+", " ".join(text).lower()))
 
 
 def trim_backend(backend: str, min_bytes: int = 243, max_bytes: int = 249) -> str:
     tokens = [t for t in (backend or "").split() if t]
-    # collapse duplicates, keep order
     seen = set()
     dedup = []
     for t in tokens:
-        if t.lower() not in seen:
-            seen.add(t.lower())
+        key = t.lower()
+        if key not in seen:
+            seen.add(key)
             dedup.append(t)
     out = " ".join(dedup)
-    # trim from the end while > max
     while bytes_no_spaces(out) > max_bytes and dedup:
-        dedup.pop()  # drop last
+        dedup.pop()
         out = " ".join(dedup)
     return out
 
@@ -185,15 +165,64 @@ def check_backend(backend: str) -> List[str]:
     b = bytes_no_spaces(backend)
     if b < 243 or b > 249:
         issues.append(f"backend bytes {b} (spaces removed) outside 243–249")
-    # commas or html
     if "," in (backend or "") or "<" in (backend or "") or ">" in (backend or ""):
         issues.append(
             "backend must be space-separated tokens (no commas/HTML)")
     return issues
 
 
+# >>> NEW: Description checker
+BR_TAG = "<br><br>"
+SENT_SPLIT = re.compile(r"(?<=[.!?])\s+")
+
+
+def _para_count(desc: str) -> int:
+    return len([p for p in (desc or "").split(BR_TAG) if p.strip()])
+
+
+def _ensure_multi_paragraph(desc: str) -> str:
+    """If model returns a single block, split roughly every 3–5 sentences."""
+    if BR_TAG in (desc or "") and _para_count(desc) >= 2:
+        return desc
+    sentences = SENT_SPLIT.split(desc or "")
+    if len(sentences) <= 3:
+        # try a middle split
+        mid = max(1, len(sentences)//2)
+        return BR_TAG.join([" ".join(sentences[:mid]).strip(), " ".join(sentences[mid:]).strip()])
+    # group into ~4 paragraphs
+    chunk = max(3, min(5, len(sentences)//4 or 3))
+    paras = []
+    for i in range(0, len(sentences), chunk):
+        paras.append(" ".join(sentences[i:i+chunk]).strip())
+    return BR_TAG.join([p for p in paras if p])
+
+
+def _strip_forbidden_breaks(desc: str) -> str:
+    # allow ONLY <br><br>
+    t = re.sub(r"<br\s*/?>", "<br>", desc or "", flags=re.I)
+    t = re.sub(r"(?:<br>){2,}", BR_TAG, t)
+    t = re.sub(r"</?[^>]+>", "", t)            # remove other html tags
+    t = t.replace("<br>", "")                  # collapse single <br>
+    return t
+
+
+def check_description(desc: str) -> List[str]:
+    issues = []
+    L = len(desc or "")
+    if L < 1500 or L > 1800:
+        issues.append(f"description length {L} outside 1500–1800")
+    if BR_TAG not in (desc or "") or _para_count(desc) < 2:
+        issues.append(
+            "description must contain MULTIPLE paragraphs separated by <br><br>")
+    # ensure only <br><br> is used
+    if re.search(r"</?[a-zA-Z]+[^>]*>", (desc or "")) or "<br>" in (desc or ""):
+        issues.append(
+            "description must use only <br><br> (no other HTML or single <br>)")
+    return issues
+
+
 def compliance_report(payload: Dict[str, Any]) -> Dict[str, Any]:
-    rep = {"titles": [], "bullets": [], "backend": []}
+    rep = {"titles": [], "bullets": [], "backend": [], "description": []}
     for item in payload.get("titles", []):
         rep["titles"].append({
             "variation": item.get("variation", ""),
@@ -201,20 +230,33 @@ def compliance_report(payload: Dict[str, Any]) -> Dict[str, Any]:
         })
     rep["bullets"] = check_bullets(payload.get("bullets", []))
     rep["backend"] = check_backend(payload.get("search_terms", ""))
+    rep["description"] = check_description(payload.get("description", ""))
     return rep
+
+
+def truncate_to_limit(text: str, max_len: int) -> str:
+    if len(text) <= max_len:
+        return text
+    cut = text[:max_len]
+    for sep in [" "+BR_TAG+" ", BR_TAG, " - ", ", ", " "]:
+        idx = cut.rfind(sep)
+        if idx >= 200:
+            return cut[:idx].rstrip()
+    return cut.rstrip()
 
 
 def apply_auto_fixes(payload: Dict[str, Any],
                      fix_titles: bool = True,
-                     fix_backend: bool = True) -> Dict[str, Any]:
+                     fix_backend: bool = True,
+                     fix_description: bool = True) -> Dict[str, Any]:
     data = json.loads(json.dumps(payload))  # deep copy
 
+    # Titles
     if fix_titles:
         new_titles = []
         for t in data.get("titles", []):
             d = t.get("desktop", "")
             m = t.get("mobile", "")
-            # Only trim if too long; if too short, keep (manual pass preferred)
             if len(d) > 180:
                 d = truncate_to_limit(d, 180)
             if len(m) > 80:
@@ -222,15 +264,28 @@ def apply_auto_fixes(payload: Dict[str, Any],
             new_titles.append({**t, "desktop": d, "mobile": m})
         data["titles"] = new_titles
 
+    # Backend
     if fix_backend:
         backend = data.get("search_terms", "")
-        # remove tokens present in surface copy
         surface = collect_surface_words(data)
         backend = scrub_backend_surface_overlap(backend, surface)
-        # trim to byte window
         backend = trim_backend(backend, 243, 249)
         data["search_terms"] = backend
 
+    # >>> Description
+    if fix_description:
+        desc = data.get("description", "") or ""
+        # allow only <br><br>
+        desc = _strip_forbidden_breaks(desc)
+        # force multiple paragraphs
+        desc = _ensure_multi_paragraph(desc)
+        # trim upper bound
+        if len(desc) > 1800:
+            desc = truncate_to_limit(desc, 1800)
+        data["description"] = desc
+
+    # refresh compliance
+    data["_compliance"] = compliance_report(data)
     return data
 
 # ───────────── OpenAI one-shot ─────────────
@@ -291,7 +346,7 @@ def generar_listing_completo_desde_df(inputs_df: pd.DataFrame, model: str = "gpt
         if not isinstance(data["bullets"], list) or len(data["bullets"]) != 5:
             raise ValueError("AI must return exactly 5 bullets.")
 
-        # attach compliance snapshot
+        # attach compliance snapshot (incluye description)
         data["_compliance"] = compliance_report(data)
         return data
 
