@@ -257,3 +257,21 @@ STRICT VALIDATION BEFORE ANSWERING:
 
 Return ONLY the JSON object. No explanations.
 """
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Backward-compat alias (so existing imports don't break)
+# ─────────────────────────────────────────────────────────────────────────────
+# Some modules import PROMPT_MASTER_JSON; keep compatibility by exposing the same callable.
+PROMPT_MASTER_JSON = prompt_master_json
+
+__all__ = [
+    "AMAZON_GUIDELINES_BRIEF",
+    "EDITORIAL_BRIEF",
+    "TITLE_CONTRACT",
+    "BULLETS_CONTRACT",
+    "DESCRIPTION_CONTRACT",
+    "BACKEND_CONTRACT",
+    "prompt_master_json",
+    "PROMPT_MASTER_JSON",
+]
