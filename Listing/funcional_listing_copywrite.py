@@ -1,50 +1,65 @@
 # listing/funcional_listing_copywrite.py
-# Un solo flujo: lee la tabla final (st.session_state["inputs_para_listing"]), arma inputs, llama a IA con PROMPT_MASTER_JSON,
-# hace validaciones y pequeñas correcciones (separadores, etiquetas, límites de longitud) y devuelve el dict final.
+# Un solo flujo: lee la tabla final, arma inputs, llama a IA con PROMPT_MASTER_JSON,
+# valida/corrige y devuelve el dict final. Sin uso de st.secrets.
 
-from listing.prompts_listing_copywrite import PROMPT_MASTER_JSON
 import os
 import re
 import json
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import pandas as pd
 import streamlit as st
 
-# Cliente OpenAI compatible 0.x y 1.x
+from listing.prompts_listing_copywrite import PROMPT_MASTER_JSON
+
+# ─────────────────────────────────────────────────────────────────────────────
+# OpenAI client (solo ENV, nada de st.secrets)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _get_api_key() -> str:
+    # SOLO variable de entorno
+    return os.environ.get("OPENAI_API_KEY") or ""
 
 
 def _openai_chat(model: str, prompt: str) -> str:
-    # Intenta OpenAI v1
+    api_key = _get_api_key()
+    if not api_key:
+        raise RuntimeError(
+            "OPENAI_API_KEY is not set in environment. Export it before running."
+        )
+    # Intento cliente v1
     try:
         from openai import OpenAI
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY",
-                        st.secrets.get("OPENAI_API_KEY", "")))
+        client = OpenAI(api_key=api_key)
         resp = client.chat.completions.create(
             model=model,
-            messages=[{"role": "system", "content": "You are a precise, policy-compliant Amazon listing copywriter."},
-                      {"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": "You are a precise, policy-compliant Amazon listing copywriter."},
+                {"role": "user", "content": prompt},
+            ],
             temperature=0.3,
         )
         return resp.choices[0].message.content
     except Exception:
-        pass
-    # Fallback a v0.28
-    import openai
-    openai.api_key = os.getenv(
-        "OPENAI_API_KEY", st.secrets.get("OPENAI_API_KEY", ""))
-    resp = openai.ChatCompletion.create(
-        model=model,
-        messages=[{"role": "system", "content": "You are a precise, policy-compliant Amazon listing copywriter."},
-                  {"role": "user", "content": prompt}],
-        temperature=0.3,
-    )
-    return resp["choices"][0]["message"]["content"]
-
+        # Fallback v0.28
+        import openai
+        openai.api_key = api_key
+        resp = openai.ChatCompletion.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": "You are a precise, policy-compliant Amazon listing copywriter."},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.3,
+        )
+        return resp["choices"][0]["message"]["content"]
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Helpers para extraer / normalizar
+# Helpers extracción / normalización
 # ─────────────────────────────────────────────────────────────────────────────
+
+
 _ALLOWED_HYPHEN = "-"
 _ALLOWED_COMMA = ","
 _BLOCK_SEP = f" {_ALLOWED_HYPHEN} "
@@ -55,7 +70,6 @@ def _norm(s: str) -> str:
 
 
 def _val_only(x: str) -> str:
-    """Elimina prefijos tipo 'color:', 'size:' si aparecieran."""
     s = _norm(x)
     s = re.sub(r"^\s*[A-Za-z]+\s*:\s*", "", s)
     s = re.sub(r"\b(color|size|talla|pack|cantidad)\b\s*:\s*",
@@ -112,7 +126,6 @@ def _emotions(df: pd.DataFrame) -> List[str]:
 
 
 def _core_tokens(df: pd.DataFrame) -> List[str]:
-    # Soporta "SEO semántico" (Etiqueta "Core") o "Token Semántico (Core)"
     mask1 = (df["Tipo"].astype(str).str.lower().eq("seo semántico")) & (
         df["Etiqueta"].astype(str).str.contains(
             r"\bcore\b", flags=re.I, regex=True)
@@ -134,12 +147,9 @@ def _attributes(df: pd.DataFrame, variations: List[str]) -> List[str]:
     mask = df["Tipo"].astype(str).str.lower().eq("atributo")
     vals = df.loc[mask, "Contenido"].astype(str).map(_val_only).tolist()
     vals = [v for v in vals if v]
-    # No duplicar valores que ya son variación
     var_l = {v.lower() for v in variations}
     vals = [v for v in vals if v.lower() not in var_l]
     return _unique(vals)
-
-# Heurística simple: prioriza atributos mencionados dentro de beneficios
 
 
 def _rank_attributes_by_benefits(attributes: List[str], benefits: List[str]) -> List[str]:
@@ -157,7 +167,6 @@ def _rank_attributes_by_benefits(attributes: List[str], benefits: List[str]) -> 
 
 
 def _clean_title_value_chunks(s: str) -> str:
-    # quita etiquetas tipo "color:"; colapsa espacios; remueve símbolos prohibidos
     s = _val_only(s)
     s = re.sub(r"[!$?_\{\}\^¬¦]+", "", s)
     s = re.sub(r"\s+", " ", s).strip()
@@ -165,15 +174,13 @@ def _clean_title_value_chunks(s: str) -> str:
 
 
 def _dedup_words_limit(title: str) -> str:
-    # No permitir la misma palabra > 2 veces
     words = _norm(title).split()
     from collections import Counter
     c = Counter([w.lower() for w in words])
     banned = {w for w, n in c.items() if n > 2}
     if not banned:
         return title
-    out_words = []
-    counts = {}
+    out_words, counts = [], {}
     for w in words:
         wl = w.lower()
         if wl in banned:
@@ -190,15 +197,12 @@ def _compose_title(brand: str, product_name: str, attrs: List[str], variation: s
     product_name = _clean_title_value_chunks(product_name)
     attrs = [_clean_title_value_chunks(a) for a in attrs if a]
     variation = _clean_title_value_chunks(variation)
-
-    # Ensamble con separadores pactados
     left = f"{brand} {product_name}".strip() if brand else product_name
     mid = (", ".join(attrs)).strip()
     if mid:
         full = f"{left}{_BLOCK_SEP}{mid}{_BLOCK_SEP}{variation}".strip()
     else:
         full = f"{left}{_BLOCK_SEP}{variation}".strip()
-
     full = _dedup_words_limit(full)
     full = re.sub(r"\s+,", ",", full)
     return full
@@ -206,13 +210,8 @@ def _compose_title(brand: str, product_name: str, attrs: List[str], variation: s
 
 def _fit_length_desktop(title: str) -> str:
     if len(title) <= 180:
-        if len(title) < 150:
-            # intentar añadir nada (no inventamos); lo dejamos y lo reportamos arriba en compliance
-            return title
-        return title
-    # cortar desde el final, preferentemente después del último bloque
+        return title  # si <150 lo dejaremos reportado por compliance
     while len(title) > 180:
-        # intenta quitar el último atributo (si existen)
         parts = title.split(_BLOCK_SEP)
         if len(parts) >= 3 and "," in parts[1]:
             attrs = [a.strip() for a in parts[1].split(",")]
@@ -221,23 +220,19 @@ def _fit_length_desktop(title: str) -> str:
                 parts[1] = ", ".join(attrs)
                 title = _BLOCK_SEP.join(parts).strip()
                 continue
-        # si no, recorta duro al último espacio
         title = title[:180].rstrip()
     return title
 
 
 def _fit_length_mobile(title: str, product_name: str) -> str:
-    # móvil 75–80; nunca recortar product_name
     if 75 <= len(title) <= 80:
         return title
-    # intentamos encoger atributos
     parts = title.split(_BLOCK_SEP)
     if len(parts) >= 2:
-        left = parts[0]  # brand + product_name
+        left = parts[0]
         mid = parts[1] if len(parts) == 3 else ""
         right = parts[2] if len(parts) == 3 else (
             parts[1] if len(parts) == 2 else "")
-        # product_name protegido: si hace falta, reducimos attrs primero
         if mid:
             attrs = [a.strip() for a in mid.split(",")]
             while len(f"{left}{_BLOCK_SEP}{', '.join(attrs)}{_BLOCK_SEP}{right}") > 80 and len(attrs) > 0:
@@ -246,21 +241,16 @@ def _fit_length_mobile(title: str, product_name: str) -> str:
             ) if attrs else f"{left}{_BLOCK_SEP}{right}".strip()
         else:
             candidate = title
-        # ajuste final duro
         if len(candidate) > 80:
             candidate = candidate[:80].rstrip()
-        # si quedó corto, no inventamos
         return candidate
-    # fallback
     return title[:80].rstrip()
 
 
 def _extract_product_name(core_tokens: List[str]) -> str:
-    # nombre a partir de cores (orden natural, 2–5 tokens razonables)
     toks = [t for t in core_tokens if re.search(r"[A-Za-z0-9]", t or "")]
     if not toks:
         return "Product"
-    # corta a 3–5 tokens
     return " ".join(toks[:5]).title()
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -269,9 +259,7 @@ def _extract_product_name(core_tokens: List[str]) -> str:
 
 
 def compliance_report(result: Dict) -> Dict:
-    """Pequeño chequeo de rangos y formato para mostrar en UI."""
     issues = []
-    # Titles
     for t in result.get("titles", []):
         d, m = t.get("desktop", ""), t.get("mobile", "")
         if not (150 <= len(d) <= 180):
@@ -282,7 +270,6 @@ def compliance_report(result: Dict) -> Dict:
                 f'Mobile title len out of range ({len(m)}): {m[:60]}…')
         if re.search(r"(color\s*:)", d, flags=re.I) or re.search(r"(color\s*:)", m, flags=re.I):
             issues.append("Title contains label like 'Color:'.")
-    # Bullets
     bullets = result.get("bullets", []) or []
     if len(bullets) != 5:
         issues.append(f"Bullets count != 5 ({len(bullets)}).")
@@ -292,14 +279,12 @@ def compliance_report(result: Dict) -> Dict:
         if not re.match(r"^[A-Z0-9][A-Z0-9\s\-&/]+:\s", b):
             issues.append(
                 f"Bullet {i} must start with ALL-CAPS HEADER and colon.")
-    # Description
     desc = result.get("description", "")
     if not (1500 <= len(desc) <= 1800):
         issues.append(f"Description len out of range ({len(desc)}).")
     if "<br><br>" not in desc:
         issues.append(
             "Description must include paragraph breaks with <br><br>.")
-    # Backend
     backend = result.get("search_terms", "")
     no_space_bytes = len(backend.replace(" ", "").encode("utf-8"))
     if not (243 <= no_space_bytes <= 249):
@@ -316,7 +301,6 @@ def generate_listing_copy(inputs_df: pd.DataFrame, model: str = "gpt-4o-mini") -
     if not isinstance(inputs_df, pd.DataFrame) or inputs_df.empty:
         raise ValueError("Empty inputs table.")
 
-    # Asegura columnas
     for col in ("Tipo", "Contenido", "Etiqueta", "Fuente"):
         if col not in inputs_df.columns:
             inputs_df[col] = ""
@@ -332,7 +316,6 @@ def generate_listing_copy(inputs_df: pd.DataFrame, model: str = "gpt-4o-mini") -
     attrs_all = _attributes(inputs_df, variations)
     attrs_ranked = _rank_attributes_by_benefits(attrs_all, benefits)
 
-    # Prompt maestro
     prompt = PROMPT_MASTER_JSON(
         brand=brand,
         brief_description=brief,
@@ -349,29 +332,21 @@ def generate_listing_copy(inputs_df: pd.DataFrame, model: str = "gpt-4o-mini") -
     try:
         data = json.loads(raw)
     except Exception:
-        # intenta limpiar bloque triple backticks si viniera
         raw2 = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=re.S)
         data = json.loads(raw2)
 
-    # ── Post-proceso títulos: construir nombre de producto a partir de cores y asegurar reglas
     product_name = _extract_product_name(cores)
-
     fixed_titles = []
     for v in variations if variations else [""]:
         v_clean = _clean_title_value_chunks(v)
-        # Usa las 3–5 primeras attrs rankeadas (se podrán recortar por longitud)
         attrs_use = attrs_ranked[:5]
         desktop = _compose_title(brand, product_name, attrs_use, v_clean)
         desktop = _fit_length_desktop(desktop)
-        # móvil a partir de desktop ajustando atributos
         mobile = _fit_length_mobile(desktop, product_name)
         fixed_titles.append({"variation": v_clean or "",
                             "desktop": desktop, "mobile": mobile})
 
-    # Si IA también trajo titles, preferimos los fijos (reglas más duras)
     data["titles"] = fixed_titles
-
-    # Asegura estructura mínima
     data.setdefault("bullets", [])
     data.setdefault("description", "")
     data.setdefault("search_terms", "")

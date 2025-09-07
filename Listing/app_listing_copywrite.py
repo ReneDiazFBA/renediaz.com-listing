@@ -1,7 +1,8 @@
 # listing/app_listing_copywrite.py
-# UI: un botón → una llamada IA → títulos (desktop/móvil por variación), 5 bullets, descripción, backend.
-# Muestra conteos y un breve reporte de compliance.
+# UI: un botón → única llamada IA → títulos, bullets, descripción, backend.
+# Verifica OPENAI_API_KEY por entorno (sin st.secrets).
 
+import os
 import json
 import streamlit as st
 import pandas as pd
@@ -25,6 +26,12 @@ def mostrar_listing_copywrite(excel_data=None):
     st.subheader("Copywriting (EN)")
     st.caption(
         "Generate Titles (desktop & mobile per variation), 5 Bullets, Description, and Backend in one AI call.")
+
+    # Prechequeo de API key por entorno
+    if not os.environ.get("OPENAI_API_KEY"):
+        st.error(
+            "Missing OPENAI_API_KEY environment variable. Set it before running.")
+        st.stop()
 
     df_inputs = _get_inputs_df()
     if df_inputs.empty:
@@ -59,7 +66,6 @@ def mostrar_listing_copywrite(excel_data=None):
         st.info("Press **Generate listing**.")
         return
 
-    # Titles
     st.markdown("### Titles (per variation)")
     for t in draft.get("titles", []):
         st.markdown(
@@ -71,26 +77,22 @@ def mostrar_listing_copywrite(excel_data=None):
         st.code(mobi)
         st.caption(f"Mobile length: {len(mobi)} chars")
 
-    # Bullets
     st.markdown("### Bullets (5)")
     bullets = draft.get("bullets", []) or []
     for i, b in enumerate(bullets[:5], 1):
         st.write(f"{i}. {b}")
         st.caption(f"Length: {len(b)} chars")
 
-    # Description
     st.markdown("### Description")
     desc = draft.get("description", "")
     st.write(desc, unsafe_allow_html=True)
     st.caption(f"Length: {len(desc)} chars")
 
-    # Backend
     st.markdown("### Backend Search Terms")
     backend = draft.get("search_terms", "")
     st.code(backend)
     st.caption(f"Bytes (no spaces): {_no_space_bytes_len(backend)}")
 
-    # Compliance report
     st.divider()
     rep = compliance_report(draft)
     if rep["issues"]:
