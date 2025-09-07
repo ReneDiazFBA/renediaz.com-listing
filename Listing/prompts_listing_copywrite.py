@@ -1,121 +1,259 @@
 # listing/prompts_listing_copywrite.py
-# All-in-one prompts for Title(s) + Bullets + Description + Backend (EN).
+# Master prompt (EN) for generating the entire Amazon listing in one call:
+# Titles (desktop & mobile per variation), Bullets, Description, Backend search terms.
+# All briefs below are OPERATIVE (seen by the model). Nothing here is just "for humans".
+
 from typing import List
 
-AMAZON_GUIDELINES_BRIEF = """
-AMAZON LISTING GUIDELINES — GLOBAL
-General:
-- Write in ENGLISH.
-- No promos, no competitors, no links/contact, no emojis/decorative symbols.
-- Title: ≤200 chars; no !, $, ?, _, {, }, ^, ¬, ¦ (except in brand field); avoid word repeated >2 times.
-- Bullets: unique, clear; no prohibited claims/symbols.
-- Description: plain text; paragraphs split with <br><br>; no other HTML.
-- Backend search terms: space-separated tokens; no commas/HTML; avoid duplication with surface copy.
-- Use numerals; standard letters; avoid subjective/comparative claims.
+# ─────────────────────────────────────────────────────────────────────────────
+# 1) AMAZON GUIDELINES – GENERAL CONTRACT (hard rules)
+# ─────────────────────────────────────────────────────────────────────────────
+AMAZON_GUIDELINES_BRIEF = r"""
+AMAZON LISTING – GLOBAL GUIDELINES (HARD RULES)
+
+Write in ENGLISH. Follow Amazon style and policy. Do not violate any of these:
+
+PROHIBITED CONTENT & FORMATS
+- No promotional phrases (e.g., “free shipping”, “discount”, “on sale”, coupons, “#1/best”).
+- No competitor mentions or comparisons.
+- No subjective or unverifiable claims (“amazing”, “best”, “top-rated”) unless substantiated on-page.
+- No phone numbers, emails, websites/URLs, or alternative ordering info.
+- No time-sensitive claims (“just in time for…”, “limited time”).
+- No HTML/JS except ALLOWED line breaks for Description: use <br><br> only.
+- Avoid special characters: !, $, ?, _, {, }, ^, ¬, ¦ in surface copy. Use standard letters/numbers.
+- Use numerals (2, 3…) instead of words (two, three…).
+- No ALL CAPS for whole sentences; title case with normal capitalization rules.
+- Avoid repetitions and keyword stuffing. Use clear, natural language.
+
+PRODUCT TITLES (GLOBAL)
+- Target ≤200 chars overall per Amazon policy; our Desktop/Mobile variants below are stricter.
+- Do not repeat the same word more than twice (brand included).
+- Allowed punctuation: hyphens (-), slashes (/), commas (,), ampersands (&), and periods (.).
+- Capitalize first letter of each word except short articles/conjunctions/prepositions.
+- Use only standard letters/numbers (no non-language ASCII like Æ, Œ, etc.).
+
+BULLET POINTS
+- 5 bullets required for our workflow.
+- Each bullet: begin with ALL-CAPS HEADER then colon, followed by sentence fragment.
+- >10 and <255 characters per Amazon; our workflow sets a narrower range below.
+- Use semicolons to separate phrases within a bullet.
+- No ending punctuation (no final period).
+- Each bullet must be unique (no duplication across bullets).
+
+DESCRIPTION
+- Limit ~2000 characters max; our workflow sets a narrower range below.
+- No HTML except <br><br> as paragraph break. Provide multiple paragraphs for readability.
+
+BACKEND SEARCH TERMS (“Generic keywords”)
+- Lowercase, space-separated tokens; no commas or punctuation.
+- No brand names, ASINs, subjective claims, profanity, or temporary terms.
+- Avoid articles, prepositions, and stop words (a, an, and, by, for, of, the, with).
+- Use synonyms, abbreviations, and spelling variants; avoid common misspellings.
+- Use either singular OR plural (not both) per token family.
+- Byte limit applies; our workflow sets an exact window.
 """
 
-EDITORIAL_BRIEF = """
-EDITORIAL BRIEF — INTEGRATED BEHAVIOR
-Use the structured table projections as ground truth (Tipo, Contenido, Etiqueta).
-Keep copy specific, concrete, benefit-led, compliant. Subtle CTAs only.
-Brand: if provided, prepend in titles; never invent a brand.
+# ─────────────────────────────────────────────────────────────────────────────
+# 2) EDITORIAL BRIEF – BEHAVIORAL RULES (mapping from the structured table)
+# ─────────────────────────────────────────────────────────────────────────────
+EDITORIAL_BRIEF = r"""
+EDITORIAL BRIEF – TABLE-DRIVEN BEHAVIOR
+
+All copy is derived from a structured table with columns: Tipo, Contenido, Etiqueta, Fuente.
+Your inputs are faithful projections of that table.
+
+MAPPING (table → inputs here):
+- Brand: rows where Tipo = "Marca" → provided implicitly via head_phrases when present.
+- Buyer Persona: rows where Tipo = "Buyer persona" → provided as buyer_persona (string).
+- Emotions: rows where Tipo = "Emoción" → provided as emotions (list). Etiqueta 'Positive' amplifies desires; 'Negative' or 'CON' addresses pains/objections.
+  Map only relevant ones to 8 core emotions: Status & Recognition; Financial Security; Time & Efficiency; Relationship & Connection;
+  Confidence & Competence; Growth & Achievement; Safety & Peace of Mind; Pleasure & Enjoyment. Identify primary/secondary emotions internally (no separate field required).
+- Benefits / Obstacles: captured in benefits list; weave PRO as advantages and CON as objections resolution.
+- Lexicon & Tone: rows where Tipo = "Léxico editorial" → provided as lexico (string). Use those terms and stylistic cues verbatim where natural.
+- SEO Semantics: rows where Tipo = "SEO semántico" (Etiqueta: Core/Cluster) → provided via core_tokens (Core preferred) and may also appear in variations/attributes.
+
+PRIORITIES
+- Be benefit-led, objection-aware, and persona-aligned.
+- Maintain clarity + fluency; avoid redundancy and keyword stuffing.
+- Prefer concrete attributes and measurable outcomes over fluff.
 """
 
-TITLE_BRIEF = """
-TITLE CONTRACT
-Two lengths per variation: Desktop 150–180 chars; Mobile 75–80 chars.
-Order: Brand + Product Name (from core tokens) + Product Type - attribute VALUES (prioritized) - variation.
-No duplication between attributes and variation. Title Case; avoid ALL CAPS; allowed punctuation only.
-Return: "titles": [{"variation":"...", "desktop":"...", "mobile":"..."}]
+# ─────────────────────────────────────────────────────────────────────────────
+# 3) ELEMENT CONTRACTS – SPECIFIC RULES PER OUTPUT
+# ─────────────────────────────────────────────────────────────────────────────
+
+TITLE_CONTRACT = r"""
+TITLE CONTRACT (DESKTOP & MOBILE, PER VARIATION)
+
+GOAL
+- Generate TWO titles per variation:
+  • Desktop: 150–180 characters (including spaces)
+  • Mobile: 75–80 characters (including spaces)
+
+COMPOSITION (in order)
+- Brand (if present; do not invent) + Product Name (built ONLY from core tokens to reflect the "what")
+- Then a hyphen " - "
+- Key Attributes (values only, not labels; draw them from items customers rated as important in reviews; ensure they are ATTRIBUTES, not variations)
+- Then a hyphen " - "
+- Variation (size/color/pack/etc.). One title object per distinct variation.
+
+RULES
+- Build the Product Name from CORE tokens ONLY (not from the short description).
+  The short description is context to understand the product, not surface copy for the name.
+- Attribute selection: use only the “value” that matches what reviews marked as important; if an item is a variation in the table, do NOT place it as attribute (avoid duplication).
+- Fit as many high-priority attributes as space allows BEFORE hitting the char limit (desktop or mobile).
+- No prohibited specials (!, $, ?, _, {, }, ^, ¬, ¦), no promo words, no competitors, ≤ 2 repeats of any word.
+- Capitalization: Title Case for main words; standard Amazon style.
+- Output per variation:
+  {"variation": "<value>", "desktop": "<150–180 chars>", "mobile": "<75–80 chars>"}
 """
 
-BULLETS_BRIEF = """
-BULLETS CONTRACT
-Exactly 5 bullets, each 130–180 chars.
-Format: ALL-CAPS HEADER: sentence fragment; use semicolons for phrases.
-Each bullet unique; integrate clusterized SEO tokens naturally; max 1 bullet addresses an objection.
-Optionally return per-variation bullets when content depends on variation.
+BULLETS_CONTRACT = r"""
+BULLETS CONTRACT (5 BULLETS, VARIATION-AWARE WHEN NEEDED)
+
+COUNT & FORMAT
+- Exactly 5 bullets, each 130–180 characters.
+- Each bullet begins with ALL-CAPS HEADER then colon, followed by a sentence fragment (no ending period).
+- Use semicolons to separate phrases within a bullet when needed.
+
+CONTENT & SOURCES
+- Must incorporate keywords from the clustered SEO semantics (Core preferred) naturally.
+- Blend “Benefits/Advantages” and address “Obstacles/Objections” grounded in reviews/persona.
+- Use the editorial lexicon where relevant.
+- Use “fascination” styles when appropriate to enhance curiosity/clarity:
+  (e.g., HOW-TO, SECRET, WHY, WHAT-NEVER, NUMBER, WARNING, DIRECT BENEFIT, SPECIFIC QUESTION, IF-THEN, QUICK & EASY, TRUTH, BETTER, SINGLE).
+  Apply them tastefully; at least two bullets should use fascination-style framing, without hype or prohibited claims.
+
+VARIATION HANDLING
+- If a bullet semantically targets a variation (e.g., pack size or color-dependent benefit), duplicate/adapt that bullet per variation and adjust the text coherently (e.g., “Pack of 2” vs “Pack of 4”).
+- Otherwise, keep bullets generic across variations.
+
+POLICY GUARDS
+- No special characters, no competitors, no subjective superlatives, no repeated bullets.
+- Use numerals; keep language natural; no keyword stuffing.
 """
 
-DESCRIPTION_BRIEF = """
-DESCRIPTION CONTRACT
-Length 1500–1800 chars. Multiple paragraphs separated with <br><br> only.
-Para1: pain+stakes; Para2: solution+benefits; Para3: use cases+specifics; Para4 (opt): objections+reassurance.
-Integrate core tokens and attribute VALUES naturally; no stuffing; no competitors or prohibited claims.
+DESCRIPTION_CONTRACT = r"""
+DESCRIPTION CONTRACT (1500–1800 CHARS, READABLE PARAGRAPHS)
+
+LENGTH & FORMAT
+- 1500–1800 characters (including spaces).
+- Plain text; separate paragraphs ONLY with <br><br>. Provide multiple paragraphs (no single block wall of text).
+
+CONTENT SHAPE
+- Narrative flow for high-intent Amazon context:
+  1) Problem/pain & stakes (persona-aligned, use 'Negative' emotions as objections)
+  2) Solution framing (product as answer) with concrete attributes → benefits (use 'Positive' emotions)
+  3) Use cases/examples to visualize outcomes
+  4) Subtle objection handling; clarity and confidence without hype
+- Use editorial lexicon; integrate core semantic tokens naturally (no stuffing).
+- Maintain clarity and specificity; avoid technical jargon unless essential (then explain simply).
+
+POLICY GUARDS
+- No prohibited characters, no competitors, no promo phrases, no subjective unverifiable claims.
+- Keep language natural and consistent with bullets and titles.
 """
 
-# >>> BACKEND BRIEF — actualizado para “sobrantes”, español y 243–249 bytes
-BACKEND_BRIEF = """
-BACKEND SEARCH TERMS CONTRACT
-Goal: produce the most relevant "generic keywords" up to 243–249 BYTES (counting bytes with SPACES REMOVED).
-Hard rules:
-- Output is ONE space-separated string in lowercase; no commas, no punctuation, no HTML.
-- No brand names, no ASINs, no promos, no subjective claims, no offensive terms.
-- Do NOT repeat any surface word (words already present in titles, bullets, description).
-- Use either singular OR plural per token family (not both).
-Coverage strategy (in priority order):
-1) CORE semantic tokens not used on surface → include them (lowercase).
-2) EXTRA tokens (non-core/cluster) not used on surface → include best-matching ones.
-3) VARIATION terms (size/color/pack) ONLY if not used on surface and truly relevant for discovery.
-4) Add meaningful synonyms/abbreviations/spelling variants (US/UK) when helpful (no “common misspellings”).
-5) Add SPANISH equivalents of CORE tokens when they are natural translations (singular only), avoid diacritics if they inflate bytes.
-Byte target:
-- Aim for 247–249 bytes (spaces removed). If above 249, drop the least-important tail tokens; if below 243, append more relevant variants.
-Return: field "search_terms": "<space separated tokens>"
+BACKEND_CONTRACT = r"""
+BACKEND SEARCH TERMS CONTRACT (243–249 BYTES, SPACES EXCLUDED)
+
+GOAL
+- Produce a single lowercase, space-separated string of tokens.
+- When removing spaces, total bytes must be 243–249 (UTF-8; avoid multi-byte symbols).
+- Maximize coverage using allowed synonyms, abbreviations, and language variants.
+
+SOURCES & INCLUSIONS
+- Prioritize Core semantic tokens (lemmatized) and high-relevance long-tail derived from attributes/variations/use cases.
+- Include Spanish equivalents of Core tokens (where meaningful for US/EU shoppers); keep everything lowercase and space-separated.
+- Include safe abbreviations and variants; avoid common misspellings.
+
+EXCLUSIONS
+- No brand names, ASINs, competitor names.
+- No subjective words (“best”, “cheapest”, etc.), no temporary terms (“new”, “on sale”).
+- No punctuation; no articles/prepositions/stop-words (a, an, and, by, for, of, the, with).
+- No duplication with surface copy is RECOMMENDED; prioritize distinct, discoverable tokens. (If minor overlap is inevitable, keep it minimal and useful.)
+- Use either singular OR plural for each token family (not both).
+
+OUTPUT
+- A single string in the field "search_terms".
 """
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 4) PROMPT MASTER – SINGLE CALL, RETURNS FULL LISTING JSON
+# ─────────────────────────────────────────────────────────────────────────────
 
-def prompt_master_json_all(
-    brand: str,
+
+def prompt_master_json(
+    head_phrases: List[str],
     core_tokens: List[str],
     attributes: List[str],
     variations: List[str],
     benefits: List[str],
-    obstacles: List[str],
     emotions: List[str],
     buyer_persona: str,
     lexico: str,
-    extra_tokens: List[str],       # <<< NUEVO
-    variation_terms: List[str],    # <<< NUEVO
 ) -> str:
-    return f"""{AMAZON_GUIDELINES_BRIEF}
+    """
+    Build the operative prompt for a single-run listing generation.
+    Inputs are projections of the consolidated table:
+      - head_phrases: may include brand and seed phrases if present (do NOT invent brand)
+      - core_tokens: semantic core lemmas (for product name + keywording)
+      - attributes: attribute VALUES (not labels), already filtered/normalized
+      - variations: variation VALUES (size/color/pack/etc.)
+      - benefits: top market-validated benefits/advantages (and obstacles enums where applicable)
+      - emotions: raw list of emotions with implicit polarity (Positive/Negative in upstream)
+      - buyer_persona: avatar summary
+      - lexico: editorial lexicon to use verbatim where natural
+    """
+
+    return f"""
+You are an Amazon Listing Copywriter. Produce the entire listing in ONE pass and return ONLY VALID JSON.
+
+GLOBAL BRIEFS (ALWAYS APPLY):
+{AMAZON_GUIDELINES_BRIEF}
 
 {EDITORIAL_BRIEF}
 
-{TITLE_BRIEF}
+CONTRACTS (SPECIFIC PER OUTPUT):
+{TITLE_CONTRACT}
 
-{BULLETS_BRIEF}
+{BULLETS_CONTRACT}
 
-{DESCRIPTION_BRIEF}
+{DESCRIPTION_CONTRACT}
 
-{BACKEND_BRIEF}
+{BACKEND_CONTRACT}
 
-You are an Amazon listing copywriter. Generate the FULL LISTING in ENGLISH.
-Use ONLY the inputs below (projections from the structured table: Tipo/Contenido/Etiqueta):
+DATA INPUTS (table-derived projections; treat them as the single source of truth):
+- Head phrases (may include brand/seed phrases if present; do NOT invent): {head_phrases}
+- Core semantic tokens (ONLY source for product name “what”): {core_tokens}
+- Attributes (VALUES only, candidate key features; exclude anything that is a variation): {attributes}
+- Variations (VALUES only; generate per-variation titles; adapt bullets only if bullet targets variation): {variations}
+- Top benefits (market-validated, client-aligned): {benefits}
+- Emotions (raw list; map internally to core emotions): {emotions}
+- Buyer persona (avatar): {buyer_persona}
+- Editorial lexicon (use terms/tone where natural): {lexico}
 
-Brand: {brand}
-Core semantic tokens (name/product foundation): {core_tokens}
-Extra semantic tokens (non-core/cluster): {extra_tokens}
-Attribute VALUES (no labels): {attributes}
-Variations (size/color/pack): {variations}
-Variation terms (normalized for backend): {variation_terms}
-Benefits: {benefits}
-Obstacles/Cons: {obstacles}
-Emotions: {emotions}
-Buyer persona: {buyer_persona}
-Editorial lexicon: {lexico}
-
-Return ONLY valid JSON with this exact schema:
+EXPECTED JSON SCHEMA (return EXACTLY these fields):
 {{
   "titles": [
-    {{"variation":"<variation>", "desktop":"<150–180 chars>", "mobile":"<75–80 chars>"}}
+    {{"variation": "<variation value>", "desktop": "<150–180 chars>", "mobile": "<75–80 chars>"}}
+    // ... one object per variation
   ],
-  "bullets": ["<130–180>", "<130–180>", "<130–180>", "<130–180>", "<130–180>"],
-  "variation_bullets": {{
-    "<variation>": ["<130–180>", "<130–180>", "<130–180>", "<130–180>", "<130–180>"]
-  }},
-  "description": "<1500–1800 chars with <br><br> paragraph breaks (multiple paragraphs)>",
-  "search_terms": "<space-separated; lowercase; 243–249 bytes when removing spaces; no surface duplicates>"
+  "bullets": [
+    "<130–180 chars bullet with ALL-CAPS HEADER: sentence fragment; no final period>",
+    "<... x5 total ...>"
+  ],
+  "description": "<1500–1800 chars with <br><br> between paragraphs>",
+  "search_terms": "<lowercase space-separated tokens; 243–249 BYTES when removing spaces>"
 }}
-Strictly follow all contracts above.
+
+STRICT VALIDATION BEFORE ANSWERING:
+- Ensure every desktop title is 150–180 chars; every mobile title is 75–80 chars (spaces included).
+- Ensure bullets are 5 items; each 130–180 chars; ALL-CAPS HEADER + ':'; no ending period.
+- Ensure description is 1500–1800 chars and uses <br><br> between paragraphs (no other HTML).
+- Ensure search_terms length (bytes without spaces) is between 243 and 249 inclusive.
+- Ensure no prohibited characters or claims appear anywhere.
+- Ensure no more than two repetitions of any single word inside each title.
+
+Return ONLY the JSON object. No explanations.
 """

@@ -1,209 +1,291 @@
 # listing/funcional_listing_copywrite.py
+# Build inputs from the unified table, call AI once, validate compliance.
 
 import os
-import re
 import json
+import re
 from typing import Dict, List, Any
+
 import pandas as pd
-from listing.prompts_listing_copywrite import prompt_master_json_all
 
-# ---------- helpers para extraer proyecciones ----------
+from listing.prompts_listing_copywrite import PROMPT_MASTER_JSON
 
-
-def _pick(df: pd.DataFrame, tipo_eq: str) -> List[str]:
-    if df.empty:
-        return []
-    m = df["Tipo"].astype(str).str.strip(
-    ).str.lower() == tipo_eq.strip().lower()
-    return df.loc[m, "Contenido"].dropna().astype(str).str.strip().tolist()
+# ─────────────────────────────
+# Utilities
+# ─────────────────────────────
 
 
-def _brand(df: pd.DataFrame) -> str:
-    vals = _pick(df, "Marca")
-    return vals[0].strip() if vals else ""
-
-
-def _attributes(df: pd.DataFrame) -> List[str]:
-    return _pick(df, "Atributo")
-
-
-def _variations(df: pd.DataFrame) -> List[str]:
-    return _pick(df, "Variación")
-
-
-def _benefits(df: pd.DataFrame) -> List[str]:
-    out = set(_pick(df, "Beneficio"))
-    out.update(_pick(df, "Beneficio valorado"))
-    out.update(_pick(df, "Ventaja"))
-    return [x for x in out if x]
-
-
-def _obstacles(df: pd.DataFrame) -> List[str]:
-    return _pick(df, "Obstáculo")
-
-
-def _emotions(df: pd.DataFrame) -> List[str]:
-    return _pick(df, "Emoción")
-
-
-def _lexicon(df: pd.DataFrame) -> str:
-    vals = _pick(df, "Léxico editorial")
-    return vals[0] if vals else ""
-
-
-def _core_tokens(df: pd.DataFrame) -> List[str]:
-    if df.empty:
-        return []
-    m = df["Tipo"].astype(str).str.lower().str.contains("seo sem", na=False)
-    sub = df.loc[m, ["Contenido", "Etiqueta"]].dropna(how="all")
-    if sub.empty:
-        return []
-    core = sub[sub["Etiqueta"].astype(str).str.lower().eq("core")]
-    if not core.empty:
-        vals = core["Contenido"].dropna().astype(str).str.strip().tolist()
-        return list(dict.fromkeys([v for v in vals if v]))
-    vals = sub["Contenido"].dropna().astype(str).str.strip().tolist()
-    return list(dict.fromkeys([v for v in vals if v]))[:50]
-
-
-def _extra_semantic_tokens(df: pd.DataFrame) -> List[str]:
-    """Tokens no-core (clusters u otros) para backend."""
-    if df.empty:
-        return []
-    m = df["Tipo"].astype(str).str.lower().str.contains("seo sem", na=False)
-    sub = df.loc[m, ["Contenido", "Etiqueta"]].dropna(how="all")
-    if sub.empty:
-        return []
-    extra = sub[~sub["Etiqueta"].astype(str).str.lower().eq("core")]
-    vals = extra["Contenido"].dropna().astype(str).str.strip().tolist()
-    # únicos, sin vacíos
-    return list(dict.fromkeys([v for v in vals if v]))[:100]
-
-
-# ---------- compliance / fixes (resumen: ya lo tienes en tu versión previa) ----------
-DISALLOWED_TITLE_CHARS = set("!$?_^¬¦{}")
-BR_TAG = "<br><br>"
-SENT_SPLIT = re.compile(r"(?<=[.!?])\s+")
-
-
-def bytes_no_spaces(s: str) -> int:
+def _no_space_bytes_len(s: str) -> int:
     return len((s or "").replace(" ", "").encode("utf-8"))
 
 
-def collect_surface_words(payload: Dict[str, Any]) -> set:
-    text = []
-    for t in payload.get("titles", []):
-        text += [t.get("desktop", ""), t.get("mobile", "")]
-    text += payload.get("bullets", [])
-    text.append(payload.get("description", ""))
-    return set(w for w in re.findall(r"[a-z0-9]+", " ".join(text).lower()))
-
-
-def trim_backend(backend: str, min_bytes: int = 243, max_bytes: int = 249) -> str:
-    tokens = [t for t in (backend or "").split() if t]
-    seen = set()
-    dedup = []
-    for t in tokens:
-        key = t.lower()
-        if key not in seen:
-            seen.add(key)
-            dedup.append(t)
-    out = " ".join(dedup)
-    while bytes_no_spaces(out) > max_bytes and dedup:
-        dedup.pop()
-        out = " ".join(dedup)
-    # si quedó por debajo, lo dejamos (el prompt intenta 247–249)
+def _clean_list(xs: List[Any]) -> List[str]:
+    out = []
+    for x in xs or []:
+        if x is None:
+            continue
+        s = str(x).strip()
+        if s:
+            out.append(s)
     return out
 
 
-def scrub_backend_surface_overlap(backend: str, surface_words: set) -> str:
-    tokens = [t for t in (backend or "").split() if t]
-    kept = [t for t in tokens if t.lower() not in surface_words]
-    return " ".join(kept) if kept else backend
-
-
-def normalize_backend_tokens(backend: str) -> str:
-    """lowercase, sin puntuación, sin stopwords cortas, sin duplicados."""
-    stop = {"a", "an", "and", "by", "for", "of", "the", "with"}
-    toks = re.findall(r"[a-z0-9]+", (backend or "").lower())
-    toks = [t for t in toks if t not in stop]
+def _unique_keep_order(xs: List[str]) -> List[str]:
     seen = set()
     out = []
-    for t in toks:
-        if t not in seen:
-            seen.add(t)
-            out.append(t)
-    return " ".join(out)
-
-# ---------- generación principal ----------
+    for x in xs:
+        if x not in seen:
+            seen.add(x)
+            out.append(x)
+    return out
 
 
-def generar_listing_completo_desde_df(inputs_df: pd.DataFrame, model: str = "gpt-4o-mini") -> Dict:
-    if not isinstance(inputs_df, pd.DataFrame) or inputs_df.empty:
-        raise ValueError(
-            "inputs_df is empty. Build 'inputs_para_listing' first.")
-    for col in ("Tipo", "Contenido", "Etiqueta", "Fuente"):
-        if col not in inputs_df.columns:
-            raise ValueError(f"Missing required column in inputs_df: {col}")
+def _lower_ascii(s: str) -> str:
+    try:
+        return s.lower()
+    except Exception:
+        return s
 
-    brand = _brand(inputs_df)
-    core = _core_tokens(inputs_df)
-    extra = _extra_semantic_tokens(inputs_df)          # <<< NUEVO
-    attrs = _attributes(inputs_df)
-    vars_ = _variations(inputs_df)
-    bens = _benefits(inputs_df)
-    cons = _obstacles(inputs_df)
-    emos = _emotions(inputs_df)
-    lexico = _lexicon(inputs_df)
-    persona_vals = _pick(inputs_df, "Buyer persona")
-    persona = persona_vals[0] if persona_vals else ""
+# ─────────────────────────────
+# 1) Build inputs from unified DF (Tipo, Contenido, Etiqueta, Fuente)
+# ─────────────────────────────
 
-    # prompt actualizado con extra_tokens y variation_terms
-    prompt = prompt_master_json_all(
-        brand=brand,
-        core_tokens=core,
-        attributes=attrs,
-        variations=vars_,
-        benefits=bens,
-        obstacles=cons,
-        emotions=emos,
-        buyer_persona=persona,
-        lexico=lexico,
-        extra_tokens=extra,
-        variation_terms=vars_,     # pasa tal cual; el prompt decide incluirlos o no
+
+def build_inputs_from_df(df: pd.DataFrame) -> Dict[str, Any]:
+    """
+    Extracts the minimal, table-driven projections we need for copywriting.
+    - brand: first row Tipo="Marca"
+    - core_tokens: Tipo="SEO semántico" & Etiqueta contains "Core"
+    - attributes: Tipo="Atributo" → use Contenido (value only)
+    - variations: Tipo="Variación" → Contenido
+    - benefits: Tipo in {"Beneficio", "Beneficio valorado", "Ventaja"}
+    - emotions: Tipo="Emoción" → Contenido
+    - buyer_persona: Tipo="Buyer persona" (first)
+    - lexico: Tipo="Léxico editorial" (first, raw string)
+    """
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return {
+            "brand": "",
+            "core_tokens": [],
+            "attributes": [],
+            "variations": [],
+            "benefits": [],
+            "emotions": [],
+            "buyer_persona": "",
+            "lexico": "",
+        }
+
+    def tipo_is(df, name: str) -> pd.Series:
+        return df["Tipo"].astype(str).str.strip().str.lower().eq(name.lower())
+
+    brand = ""
+    _brand_rows = df[tipo_is(df, "marca")
+                     ] if "Tipo" in df.columns else pd.DataFrame()
+    if not _brand_rows.empty:
+        brand = str(_brand_rows.iloc[0]["Contenido"]).strip()
+
+    core_tokens = []
+    if {"Tipo", "Etiqueta", "Contenido"}.issubset(df.columns):
+        core_mask = (df["Tipo"].astype(str).str.lower().str.strip() == "seo semántico") | \
+                    (df["Tipo"].astype(str).str.lower(
+                    ).str.strip() == "seo semantico")
+        core_mask = core_mask & df["Etiqueta"].astype(
+            str).str.contains(r"\bcore\b", case=False, na=False)
+        core_tokens = _clean_list(
+            df.loc[core_mask, "Contenido"].astype(str).tolist())
+
+    attributes = []
+    if "Tipo" in df.columns and "Contenido" in df.columns:
+        attr_mask = df["Tipo"].astype(
+            str).str.lower().str.strip().eq("atributo")
+        attributes = _clean_list(
+            df.loc[attr_mask, "Contenido"].astype(str).tolist())
+
+    variations = []
+    if "Tipo" in df.columns and "Contenido" in df.columns:
+        var_mask = df["Tipo"].astype(str).str.lower().str.strip().eq("variación") | \
+            df["Tipo"].astype(str).str.lower().str.strip().eq("variacion")
+        variations = _clean_list(
+            df.loc[var_mask, "Contenido"].astype(str).tolist())
+
+    benefits = []
+    if "Tipo" in df.columns and "Contenido" in df.columns:
+        ben_mask = df["Tipo"].astype(str).str.lower().str.strip().isin(
+            ["beneficio", "beneficio valorado", "ventaja"]
+        )
+        benefits = _clean_list(
+            df.loc[ben_mask, "Contenido"].astype(str).tolist())
+
+    emotions = []
+    if "Tipo" in df.columns and "Contenido" in df.columns:
+        emo_mask = df["Tipo"].astype(str).str.lower().str.strip().eq("emoción") | \
+            df["Tipo"].astype(str).str.lower().str.strip().eq("emocion")
+        emotions = _clean_list(
+            df.loc[emo_mask, "Contenido"].astype(str).tolist())
+
+    buyer_persona = ""
+    bp_rows = df[df["Tipo"].astype(str).str.lower().str.strip().eq(
+        "buyer persona")] if "Tipo" in df.columns else pd.DataFrame()
+    if not bp_rows.empty:
+        buyer_persona = str(bp_rows.iloc[0]["Contenido"]).strip()
+
+    lexico = ""
+    lex_rows = df[df["Tipo"].astype(str).str.lower().str.strip().eq(
+        "léxico editorial")] if "Tipo" in df.columns else pd.DataFrame()
+    if lex_rows.empty and "Tipo" in df.columns:
+        lex_rows = df[df["Tipo"].astype(
+            str).str.lower().str.strip().eq("lexico editorial")]
+    if not lex_rows.empty:
+        lexico = str(lex_rows.iloc[0]["Contenido"]).strip()
+
+    # Deduplicate while keeping order
+    core_tokens = _unique_keep_order(core_tokens)
+    attributes = _unique_keep_order(attributes)
+    variations = _unique_keep_order(variations)
+    benefits = _unique_keep_order(benefits)
+    emotions = _unique_keep_order(emotions)
+
+    return {
+        "brand": brand,
+        "core_tokens": core_tokens,
+        "attributes": attributes,
+        "variations": variations,
+        "benefits": benefits,
+        "emotions": emotions,
+        "buyer_persona": buyer_persona,
+        "lexico": lexico,
+    }
+
+# ─────────────────────────────
+# 2) Call AI once (gpt-4o-mini). Return JSON.
+# ─────────────────────────────
+
+
+def generate_listing_json(inputs: Dict[str, Any], model: str = "gpt-4o-mini") -> Dict[str, Any]:
+    """
+    Single-shot generation: titles (per variation, desktop/mobile), 5 bullets, description, backend.
+    Requires OPENAI_API_KEY in environment/st.secrets. No fallback text here by design.
+    """
+    prompt = PROMPT_MASTER_JSON(
+        brand=inputs.get("brand", ""),
+        core_tokens=inputs.get("core_tokens", []),
+        attributes=inputs.get("attributes", []),
+        variations=inputs.get("variations", []),
+        benefits=inputs.get("benefits", []),
+        emotions=inputs.get("emotions", []),
+        buyer_persona=inputs.get("buyer_persona", ""),
+        lexico=inputs.get("lexico", ""),
     )
+
+    # Import lazily so environments without openai don't fail on import.
+    try:
+        from openai import OpenAI
+    except Exception as e:
+        raise RuntimeError(
+            "OpenAI SDK not available. Install 'openai' >= 1.0.0") from e
 
     api_key = os.getenv("OPENAI_API_KEY", "")
     if not api_key:
-        raise RuntimeError(
-            "OPENAI_API_KEY not found. Set it before generating the listing.")
+        # Streamlit secrets (optional)
+        try:
+            import streamlit as st
+            api_key = st.secrets.get("OPENAI_API_KEY", "")
+        except Exception:
+            pass
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY not found.")
 
+    client = OpenAI(api_key=api_key)
+
+    resp = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": "You are a precise Amazon listing copywriter. Always return strict JSON."},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.2,
+        response_format={"type": "json_object"},
+    )
+
+    text = resp.choices[0].message.content
     try:
-        from openai import OpenAI
-        client = OpenAI(api_key=api_key)
-        resp = client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.4,
-            max_tokens=2300,
-        )
-        content = resp.choices[0].message.content
-        data = json.loads(content)
-
-        # schema mínimo
-        for k in ("titles", "bullets", "description", "search_terms"):
-            if k not in data:
-                raise ValueError(f"Missing key in AI response: {k}")
-
-        # post-proceso del backend: normalizar, quitar “surface”, forzar bytes
-        surface = collect_surface_words(data)
-        bk = data.get("search_terms", "")
-        bk = normalize_backend_tokens(bk)
-        bk = scrub_backend_surface_overlap(bk, surface)
-        bk = trim_backend(bk, 243, 249)
-        data["search_terms"] = bk
-
-        return data
-
+        data = json.loads(text)
     except Exception as e:
-        raise RuntimeError(f"OpenAI call failed: {e}")
+        raise RuntimeError(
+            f"Model did not return valid JSON. Raw: {text[:400]}") from e
+
+    # Minimal shape guard
+    for k in ("titles", "bullets", "description", "search_terms"):
+        if k not in data:
+            raise RuntimeError(f"Missing '{k}' in model output.")
+    return data
+
+# ─────────────────────────────
+# 3) Compliance checks (hard constraints)
+# ─────────────────────────────
+
+
+def compliance_report(draft: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Returns pass/fail + notes for: titles length, bullets count/length/format, description length, backend bytes/format.
+    """
+    report = {"ok": True, "issues": []}
+
+    # Titles
+    titles = draft.get("titles", [])
+    if not isinstance(titles, list) or not titles:
+        report["ok"] = False
+        report["issues"].append("No titles array returned.")
+    else:
+        for i, t in enumerate(titles, 1):
+            desktop = (t or {}).get("desktop", "")
+            mobile = (t or {}).get("mobile", "")
+            if not (150 <= len(desktop) <= 180):
+                report["ok"] = False
+                report["issues"].append(
+                    f"Title #{i} desktop length={len(desktop)} (must be 150–180).")
+            if not (75 <= len(mobile) <= 80):
+                report["ok"] = False
+                report["issues"].append(
+                    f"Title #{i} mobile length={len(mobile)} (must be 75–80).")
+
+    # Bullets
+    bullets = draft.get("bullets", [])
+    if len(bullets) != 5:
+        report["ok"] = False
+        report["issues"].append(f"Bullets count={len(bullets)} (must be 5).")
+    for j, b in enumerate(bullets, 1):
+        L = len(b or "")
+        if not (130 <= L <= 180):
+            report["ok"] = False
+            report["issues"].append(
+                f"Bullet {j} length={L} (must be 130–180).")
+        if not re.match(r"^[A-Z0-9][A-Z0-9\s&\-\/]+:\s", b or ""):
+            report["ok"] = False
+            report["issues"].append(
+                f"Bullet {j} must start with ALL-CAPS HEADER followed by ': '.")
+
+    # Description
+    desc = draft.get("description", "")
+    if not (1500 <= len(desc) <= 1800):
+        report["ok"] = False
+        report["issues"].append(
+            f"Description length={len(desc)} (must be 1500–1800).")
+    if "<br><br>" not in (desc or ""):
+        report["issues"].append(
+            "Description should use <br><br> between paragraphs (advisory).")
+
+    # Backend
+    backend = draft.get("search_terms", "") or ""
+    bytes_no_space = _no_space_bytes_len(backend)
+    if not (243 <= bytes_no_space <= 249):
+        report["ok"] = False
+        report["issues"].append(
+            f"Search terms bytes(no spaces)={bytes_no_space} (must be 243–249).")
+    if backend.strip() != backend.strip().lower():
+        report["issues"].append("Search terms should be lowercase.")
+    if re.search(r"[,;:\-_/\\.]", backend):
+        report["issues"].append(
+            "Search terms should not contain punctuation; use spaces only.")
+
+    return report
