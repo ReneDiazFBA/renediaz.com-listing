@@ -1,7 +1,5 @@
 # listing/app_listing_copywrite.py
-# UI de Copywriting para la pestaña "Copywriting" del Dashboard.
-# Muestra Title, 5 Bullets, Description y Backend, con conteos exactos.
-# Backend: cuenta bytes ignorando espacios.
+# UI: IA-only (gpt-4o-mini). Un botón “Generate copy”.
 
 import json
 import streamlit as st
@@ -12,14 +10,16 @@ from listing.funcional_listing_copywrite import lafuncionqueejecuta_listing_copy
 
 def _get_inputs_df() -> pd.DataFrame:
     df = st.session_state.get("inputs_para_listing", pd.DataFrame())
-    if not isinstance(df, pd.DataFrame):
-        return pd.DataFrame()
-    return df
+    return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
+
+
+def _no_space_bytes_len(s: str) -> int:
+    return len((s or "").replace(" ", "").encode("utf-8"))
 
 
 def _export_buttons(draft: dict):
-    col1, col2 = st.columns(2)
-    with col1:
+    c1, c2 = st.columns(2)
+    with c1:
         st.download_button(
             "⬇️ Descargar JSON",
             data=json.dumps(draft, ensure_ascii=False, indent=2),
@@ -27,7 +27,7 @@ def _export_buttons(draft: dict):
             mime="application/json",
             use_container_width=True,
         )
-    with col2:
+    with c2:
         st.download_button(
             "⬇️ Backend Search Terms (.txt)",
             data=draft.get("search_terms", ""),
@@ -37,25 +37,19 @@ def _export_buttons(draft: dict):
         )
 
 
-def _no_space_bytes_len(s: str) -> int:
-    """Cuenta bytes en UTF-8 ignorando espacios."""
-    return len((s or "").replace(" ", "").encode("utf-8"))
-
-
 def mostrar_listing_copywrite(excel_data=None):
-    st.subheader("Copywriting")
+    st.subheader("Copywriting (IA)")
     st.caption(
-        "Genera Title, Bullets, Description y Backend (EN) desde los inputs consolidados.")
+        "Genera Title, Bullets, Description y Backend (EN) desde los inputs consolidados (IA-only).")
 
     df_inputs = _get_inputs_df()
-
     if df_inputs.empty:
         st.warning(
-            "No hay inputs disponibles. Ve a **Mercado → Cliente / Tabla** para construir 'inputs_para_listing'.")
+            "No hay inputs. Ve a Mercado → Cliente / Tabla para construir 'inputs_para_listing'.")
         with st.expander("¿Qué debería ver aquí?", expanded=False):
             st.markdown(
-                "- Filas como **Nombre sugerido**, **Descripción breve**, **Beneficio**, **Atributo**, **Variación**, "
-                "**Emoción**, **Buyer persona**, **Léxico editorial**, y **Token Semántico** (Fuente: Clustering)."
+                "- Filas como **Marca**, **Descripción breve**, **Buyer persona**, **Beneficio valorado**, **Ventaja/Obstáculo**, "
+                "**Emoción**, **Atributo/Variación**, **Léxico editorial**, **SEO semántico**."
             )
         return
 
@@ -64,26 +58,13 @@ def mostrar_listing_copywrite(excel_data=None):
 
     st.divider()
 
-    # Controles
-    c1, c2 = st.columns([1, 2])
-    with c1:
-        use_ai = st.toggle("Use AI (cheap)", value=True,
-                           help="IA económica (gpt-4o-mini) si hay OPENAI_API_KEY. Si no, fallback 0$.")
-    with c2:
-        cost_saver = st.toggle(
-            "Cost saver", value=True, help="Recorta el prompt/inputs para abaratar pruebas.")
-
     if st.button("Generate copy", type="primary", use_container_width=True):
         try:
-            draft = lafuncionqueejecuta_listing_copywrite(
-                inputs_df=df_inputs,
-                use_ai=use_ai,
-                cost_saver=cost_saver,
-            )
-            st.success("Borrador generado.")
+            draft = lafuncionqueejecuta_listing_copywrite(inputs_df=df_inputs)
             st.session_state["draft_listing"] = draft
+            st.success("Borrador generado con IA.")
         except Exception as e:
-            st.error(f"Error al generar copy: {e}")
+            st.error(f"Error al generar copy con IA: {e}")
             return
 
     draft = st.session_state.get("draft_listing", {})
@@ -91,7 +72,7 @@ def mostrar_listing_copywrite(excel_data=None):
         st.info("Aún no hay borrador. Haz clic en **Generate copy**.")
         return
 
-    # --- Render del borrador ---
+    # Render
     st.markdown("### Draft (EN)")
 
     # Title
@@ -117,8 +98,8 @@ def mostrar_listing_copywrite(excel_data=None):
     st.markdown("**Backend Search Terms**")
     backend = draft.get("search_terms", "")
     st.code(backend)
-    backend_bytes = _no_space_bytes_len(backend)
-    st.caption(f"Length: {backend_bytes} bytes (spaces not counted)")
+    st.caption(
+        f"Length: {_no_space_bytes_len(backend)} bytes (spaces not counted)")
 
     st.divider()
     _export_buttons(draft)

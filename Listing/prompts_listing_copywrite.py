@@ -3,22 +3,73 @@
 
 from typing import List
 
-POLICY_BRIEF = """Write in English. Follow Amazon style:
-- No promotional language (free, discount, sale, coupon, shipping), no competitor mentions, no "#1/best".
-- No special symbols (™, ®, &, @), no emojis, no HTML.
-- Respect these HARD ranges:
-  * Title: 150–200 characters.
-  * Bullets: 180–240 characters each.
-  * Description: 1600–2000 characters (plain text; paragraphs separated by <br><br>).
-  * Backend: 243–249 BYTES, counting bytes with SPACES REMOVED (space is a separator only).
-- Use clear benefits and concrete attributes. Avoid subjective claims.
-- Do NOT include competitors.
-- Backend must NOT repeat words already present in title/bullets/description.
-- Backend may include common misspellings (typos) and terms in other languages when relevant.
-- Use either plural OR singular forms (not both) for the same token family.
+# ============================================================
+# AMAZON — GENERAL POLICY GUIDELINES (Contrato de cumplimiento)
+# Sustituye al antiguo POLICY_BRIEF
+# ============================================================
+
+AMAZON_GUIDELINES_BRIEF = """
+AMAZON LISTING – GENERAL POLICY GUIDELINES
+
+Follow Amazon’s global rules for product detail pages. These rules apply to all products
+(unless explicitly overridden by category-specific style guides).
+
+TITLE
+- Maximum 200 characters (spaces included).
+- Order recommended: Brand + Line/Model + Product Type + 1–2 Key Attributes (material, color, size, pack).
+- Use numerals ("2" not "two").
+- No ALL CAPS, no promotional language ("free shipping", "best", "#1"), no competitor mentions.
+- No special characters: !, $, ?, _, {, }, ^, ¬, ¦. Use only standard punctuation (- , / & .).
+- No redundant words or unnecessary synonyms.
+- Parent ASIN: generic title (no variation details). Child ASIN: include the variation (color/size).
+
+BULLETS
+- 5 bullets recommended, each concise (<200 characters is a safe target; hard max varies by category).
+- Structure: Attribute + Benefit + Use case.
+- Start with capital letter; avoid trailing punctuation.
+- No subjective claims ("amazing", "perfect") and no promotions.
+- Keep bullet structure consistent across variations.
+
+DESCRIPTION
+- 1,600–2,000 characters recommended.
+- Plain text only; separate paragraphs with <br><br>.
+- Expand bullets into narrative (benefits, objections handled, use-cases).
+- No HTML tags (beyond <br><br> as separators), no emojis, no promotions.
+
+SEARCH TERMS (Backend Keywords)
+- Limit: 249 bytes max (measured without spaces).
+- Do not repeat surface words from title, bullets, or description.
+- Space-separated only (no commas or punctuation).
+- Include synonyms, common misspellings, and relevant foreign terms.
+- No brand names, ASINs, competitor references, or misleading terms.
+- Choose singular OR plural, not both.
+
+IMAGES
+- Main image: pure white background (RGB 255), product ≥85% of frame.
+- Professional photo only; no text, logos, watermarks, or misleading props.
+- High resolution: ≥1600 px longest side (zoom enabled).
+- Additional images: lifestyle, details, scale, and usage context.
+
+VARIATIONS
+- Allowed only when differences are a consistent attribute (size/color/pack).
+- Parent: generic title/images. Child: variation-specific title/images.
+- Do not group unrelated products.
+
+GENERAL PROHIBITIONS
+- No false or unverifiable claims.
+- No reviews, quotes, or testimonials inside listing copy.
+- No time-sensitive info (events, tour dates, etc.).
+- No contact details, external URLs, or ordering info.
+- One detail page = one unique product (no multi-product pages).
+- Ensure valid category/browse node and product identifiers (UPC/EAN).
+
+Non-compliance may result in listing suppression, automated corrections, or removal.
 """
 
-# Embedded editorial brief (integrated behavior against the structured table)
+# ============================================================
+# EDITORIAL BRIEF (lo iremos afinando más adelante)
+# ============================================================
+
 EDITORIAL_BRIEF = """
 EDITORIAL BRIEF – INTEGRATED VERSION (BEHAVIORAL RULES)
 
@@ -51,6 +102,10 @@ FORMATS TO PRODUCE:
 - Backend (243–249 bytes without spaces): space-separated tokens; no commas/HTML; do not repeat any surface words; may include typos/other languages; enforce singular OR plural (not both).
 """
 
+# ============================================================
+# Prompt maestro (genera Title + Bullets + Description + Backend en 1 paso)
+# ============================================================
+
 
 def prompt_master_json(
     head_phrases: List[str],
@@ -63,11 +118,13 @@ def prompt_master_json(
     lexico: str,
 ) -> str:
     """
-    We keep the same signature so upstream code does not change.
-    The EDITORIAL_BRIEF is embedded so the model understands how to use the table-derived inputs.
+    Master prompt que fija:
+    - Cumplimiento de políticas de Amazon (AMAZON_GUIDELINES_BRIEF).
+    - Marco editorial (EDITORIAL_BRIEF).
+    - Generación en un solo paso: title, bullets, description y search_terms.
     """
 
-    return f"""{POLICY_BRIEF}
+    return f"""{AMAZON_GUIDELINES_BRIEF}
 
 {EDITORIAL_BRIEF}
 
