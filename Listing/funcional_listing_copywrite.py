@@ -1,354 +1,229 @@
 # listing/funcional_listing_copywrite.py
-# Un solo flujo: lee la tabla final, arma inputs, llama a IA con PROMPT_MASTER_JSON,
-# valida/corrige y devuelve el dict final. Sin uso de st.secrets.
+# v1.0 (contract-aligned) — Genera prompts por ETAPA (Title, Bullets, Description, Backend)
+# y ejecuta 4 llamadas separadas al modelo. Cumple el Contrato:
+# - Usa SOLO la tabla `inputs_para_listing` (inyectada desde app) -> no lee Excel crudo.
+# - Se pega a PDFs (normativas + SOP) a través del dict `rules` (inyectado por la capa que parsea PDFs).
+# - Devuelve JSON final ya sanitizado por `lafuncionqueejecuta_listing_sanitizer_en`.
 
+from typing import Any, Dict, List, Optional
 import os
 import re
 import json
-from typing import Dict, List
-
 import pandas as pd
-import streamlit as st
 
-from listing.prompts_listing_copywrite import PROMPT_MASTER_JSON
+from listing.prompts_listing_copywrite import (
+    build_prompt_title,
+    build_prompt_bullets,
+    build_prompt_description,
+    build_prompt_backend,
+)
+from listing.funcional_listing_sanitizer_en import lafuncionqueejecuta_listing_sanitizer_en
 
-# ─────────────────────────────────────────────────────────────────────────────
-# OpenAI client (solo ENV, nada de st.secrets)
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-def _get_api_key() -> str:
-    # SOLO variable de entorno
-    return os.environ.get("OPENAI_API_KEY") or ""
-
-
-def _openai_chat(model: str, prompt: str) -> str:
-    api_key = _get_api_key()
-    if not api_key:
-        raise RuntimeError(
-            "OPENAI_API_KEY is not set in environment. Export it before running."
-        )
-    # Intento cliente v1
-    try:
-        from openai import OpenAI
-        client = OpenAI(api_key=api_key)
-        resp = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": "You are a precise, policy-compliant Amazon listing copywriter."},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.3,
-        )
-        return resp.choices[0].message.content
-    except Exception:
-        # Fallback v0.28
-        import openai
-        openai.api_key = api_key
-        resp = openai.ChatCompletion.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": "You are a precise, policy-compliant Amazon listing copywriter."},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.3,
-        )
-        return resp["choices"][0]["message"]["content"]
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Helpers extracción / normalización
-# ─────────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------
+# Helpers de extracción desde inputs_para_listing (DataFrame)
+# -------------------------------------------------------------
 
 
-_ALLOWED_HYPHEN = "-"
-_ALLOWED_COMMA = ","
-_BLOCK_SEP = f" {_ALLOWED_HYPHEN} "
-
-
-def _norm(s: str) -> str:
-    return re.sub(r"\s+", " ", (s or "").strip())
-
-
-def _val_only(x: str) -> str:
-    s = _norm(x)
-    s = re.sub(r"^\s*[A-Za-z]+\s*:\s*", "", s)
-    s = re.sub(r"\b(color|size|talla|pack|cantidad)\b\s*:\s*",
-               "", s, flags=re.I)
-    return s.strip()
+def _take(df: pd.DataFrame, tipo: str) -> List[str]:
+    if df is None or df.empty:
+        return []
+    if "Tipo" not in df.columns or "Contenido" not in df.columns:
+        return []
+    sub = df[df["Tipo"] == tipo]["Contenido"].dropna().astype(str).tolist()
+    return [s.strip() for s in sub if str(s).strip()]
 
 
 def _unique(seq: List[str]) -> List[str]:
-    out, seen = [], set()
-    for x in seq:
-        k = x.lower().strip()
+    seen, out = set(), []
+    for s in seq:
+        k = re.sub(r"\s+", " ", str(s).strip().lower())
         if k and k not in seen:
+            out.append(str(s).strip())
             seen.add(k)
-            out.append(x)
     return out
 
 
-def _from_df(df: pd.DataFrame, tipo: str) -> List[str]:
-    mask = df["Tipo"].astype(str).str.lower().eq(tipo.lower())
-    return df.loc[mask, "Contenido"].astype(str).str.strip().tolist()
+def _collect_inputs(df: pd.DataFrame, cost_saver: bool = True) -> Dict[str, Any]:
+    head_phrases = _unique(_take(df, "Keyword Frase"))
+    core_tokens = _unique(_take(df, "Token Semántico"))
+    attributes = _unique(_take(df, "Atributo"))
+    variations = _unique(_take(df, "Variación"))
+    benefits = _unique(_take(df, "Beneficio"))
+    emotions = _unique(_take(df, "Emoción"))
+    buyer_persona = " ".join(_take(df, "Buyer persona")[:1])
+    lexico = " ".join(_take(df, "Léxico editorial")[:1])
+
+    # Recortes para abaratar
+    if cost_saver:
+        head_phrases = head_phrases[:10]
+        core_tokens = core_tokens[:40]
+        attributes = attributes[:20]
+        variations = variations[:20]
+        benefits = benefits[:20]
+        emotions = emotions[:10]
+
+    return {
+        "head_phrases": head_phrases,
+        "core_tokens": core_tokens,
+        "attributes": attributes,
+        "variations": variations,
+        "benefits": benefits,
+        "emotions": emotions,
+        "buyer_persona": buyer_persona,
+        "lexico": lexico,
+    }
+
+# -------------------------------------------------------------
+# LLM call (economica) — 1 etapa = 1 llamada
+# -------------------------------------------------------------
 
 
-def _brand(df: pd.DataFrame) -> str:
-    vals = _from_df(df, "Marca")
-    return vals[0].strip() if vals else ""
-
-
-def _brief_desc(df: pd.DataFrame) -> str:
-    vals = _from_df(df, "Descripción breve")
-    return vals[0].strip() if vals else ""
-
-
-def _buyer_persona(df: pd.DataFrame) -> str:
-    vals = _from_df(df, "Buyer persona")
-    return vals[0].strip() if vals else ""
-
-
-def _lexico(df: pd.DataFrame) -> str:
-    vals = _from_df(df, "Léxico editorial")
-    return vals[0].strip() if vals else ""
-
-
-def _benefits(df: pd.DataFrame) -> List[str]:
-    tipos = ["Beneficio", "Beneficio valorado", "Ventaja"]
-    mask = df["Tipo"].astype(str).str.lower().isin([t.lower() for t in tipos])
-    out = df.loc[mask, "Contenido"].astype(str).str.strip().tolist()
-    return _unique([x for x in out if x])
-
-
-def _emotions(df: pd.DataFrame) -> List[str]:
-    mask = df["Tipo"].astype(str).str.lower().eq("emoción")
-    out = df.loc[mask, "Contenido"].astype(str).str.strip().tolist()
-    return _unique([x for x in out if x])
-
-
-def _core_tokens(df: pd.DataFrame) -> List[str]:
-    mask1 = (df["Tipo"].astype(str).str.lower().eq("seo semántico")) & (
-        df["Etiqueta"].astype(str).str.contains(
-            r"\bcore\b", flags=re.I, regex=True)
-    )
-    mask2 = df["Tipo"].astype(str).str.lower().eq("token semántico (core)")
-    out = pd.concat([df.loc[mask1, "Contenido"],
-                    df.loc[mask2, "Contenido"]], ignore_index=True)
-    vals = out.astype(str).str.strip().tolist()
-    return _unique([x for x in vals if x])
-
-
-def _variations(df: pd.DataFrame) -> List[str]:
-    mask = df["Tipo"].astype(str).str.lower().eq("variación")
-    vals = df.loc[mask, "Contenido"].astype(str).map(_val_only).tolist()
-    return _unique([x for x in vals if x])
-
-
-def _attributes(df: pd.DataFrame, variations: List[str]) -> List[str]:
-    mask = df["Tipo"].astype(str).str.lower().eq("atributo")
-    vals = df.loc[mask, "Contenido"].astype(str).map(_val_only).tolist()
-    vals = [v for v in vals if v]
-    var_l = {v.lower() for v in variations}
-    vals = [v for v in vals if v.lower() not in var_l]
-    return _unique(vals)
-
-
-def _rank_attributes_by_benefits(attributes: List[str], benefits: List[str]) -> List[str]:
-    scores = []
-    benefit_blob = " ".join(benefits).lower()
-    for a in attributes:
-        cnt = benefit_blob.count(a.lower())
-        scores.append((cnt, len(a), a))
-    scores.sort(key=lambda t: (t[0], t[1]), reverse=True)
-    return [a for _, __, a in scores]
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Validadores / Correcciones
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-def _clean_title_value_chunks(s: str) -> str:
-    s = _val_only(s)
-    s = re.sub(r"[!$?_\{\}\^¬¦]+", "", s)
-    s = re.sub(r"\s+", " ", s).strip()
-    return s
-
-
-def _dedup_words_limit(title: str) -> str:
-    words = _norm(title).split()
-    from collections import Counter
-    c = Counter([w.lower() for w in words])
-    banned = {w for w, n in c.items() if n > 2}
-    if not banned:
-        return title
-    out_words, counts = [], {}
-    for w in words:
-        wl = w.lower()
-        if wl in banned:
-            n = counts.get(wl, 0)
-            if n >= 2:
-                continue
-            counts[wl] = n + 1
-        out_words.append(w)
-    return " ".join(out_words)
-
-
-def _compose_title(brand: str, product_name: str, attrs: List[str], variation: str) -> str:
-    brand = _clean_title_value_chunks(brand)
-    product_name = _clean_title_value_chunks(product_name)
-    attrs = [_clean_title_value_chunks(a) for a in attrs if a]
-    variation = _clean_title_value_chunks(variation)
-    left = f"{brand} {product_name}".strip() if brand else product_name
-    mid = (", ".join(attrs)).strip()
-    if mid:
-        full = f"{left}{_BLOCK_SEP}{mid}{_BLOCK_SEP}{variation}".strip()
-    else:
-        full = f"{left}{_BLOCK_SEP}{variation}".strip()
-    full = _dedup_words_limit(full)
-    full = re.sub(r"\s+,", ",", full)
-    return full
-
-
-def _fit_length_desktop(title: str) -> str:
-    if len(title) <= 180:
-        return title  # si <150 lo dejaremos reportado por compliance
-    while len(title) > 180:
-        parts = title.split(_BLOCK_SEP)
-        if len(parts) >= 3 and "," in parts[1]:
-            attrs = [a.strip() for a in parts[1].split(",")]
-            if len(attrs) > 1:
-                attrs = attrs[:-1]
-                parts[1] = ", ".join(attrs)
-                title = _BLOCK_SEP.join(parts).strip()
-                continue
-        title = title[:180].rstrip()
-    return title
-
-
-def _fit_length_mobile(title: str, product_name: str) -> str:
-    if 75 <= len(title) <= 80:
-        return title
-    parts = title.split(_BLOCK_SEP)
-    if len(parts) >= 2:
-        left = parts[0]
-        mid = parts[1] if len(parts) == 3 else ""
-        right = parts[2] if len(parts) == 3 else (
-            parts[1] if len(parts) == 2 else "")
-        if mid:
-            attrs = [a.strip() for a in mid.split(",")]
-            while len(f"{left}{_BLOCK_SEP}{', '.join(attrs)}{_BLOCK_SEP}{right}") > 80 and len(attrs) > 0:
-                attrs = attrs[:-1]
-            candidate = f"{left}{_BLOCK_SEP}{', '.join(attrs)}{_BLOCK_SEP}{right}".strip(
-            ) if attrs else f"{left}{_BLOCK_SEP}{right}".strip()
-        else:
-            candidate = title
-        if len(candidate) > 80:
-            candidate = candidate[:80].rstrip()
-        return candidate
-    return title[:80].rstrip()
-
-
-def _extract_product_name(core_tokens: List[str]) -> str:
-    toks = [t for t in core_tokens if re.search(r"[A-Za-z0-9]", t or "")]
-    if not toks:
-        return "Product"
-    return " ".join(toks[:5]).title()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# API pública
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-def compliance_report(result: Dict) -> Dict:
-    issues = []
-    for t in result.get("titles", []):
-        d, m = t.get("desktop", ""), t.get("mobile", "")
-        if not (150 <= len(d) <= 180):
-            issues.append(
-                f'Desktop title len out of range ({len(d)}): {d[:60]}…')
-        if not (75 <= len(m) <= 80):
-            issues.append(
-                f'Mobile title len out of range ({len(m)}): {m[:60]}…')
-        if re.search(r"(color\s*:)", d, flags=re.I) or re.search(r"(color\s*:)", m, flags=re.I):
-            issues.append("Title contains label like 'Color:'.")
-    bullets = result.get("bullets", []) or []
-    if len(bullets) != 5:
-        issues.append(f"Bullets count != 5 ({len(bullets)}).")
-    for i, b in enumerate(bullets, 1):
-        if not (130 <= len(b) <= 180):
-            issues.append(f"Bullet {i} len out of range ({len(b)}).")
-        if not re.match(r"^[A-Z0-9][A-Z0-9\s\-&/]+:\s", b):
-            issues.append(
-                f"Bullet {i} must start with ALL-CAPS HEADER and colon.")
-    desc = result.get("description", "")
-    if not (1500 <= len(desc) <= 1800):
-        issues.append(f"Description len out of range ({len(desc)}).")
-    if "<br><br>" not in desc:
-        issues.append(
-            "Description must include paragraph breaks with <br><br>.")
-    backend = result.get("search_terms", "")
-    no_space_bytes = len(backend.replace(" ", "").encode("utf-8"))
-    if not (243 <= no_space_bytes <= 249):
-        issues.append(
-            f"Backend bytes (no spaces) out of range: {no_space_bytes}.")
-    if re.search(r"[A-Z]", backend):
-        issues.append("Backend must be lowercase tokens.")
-    if "," in backend or "." in backend or ";" in backend or ":" in backend:
-        issues.append("Backend must not include punctuation.")
-    return {"issues": issues}
-
-
-def generate_listing_copy(inputs_df: pd.DataFrame, model: str = "gpt-4o-mini") -> Dict:
-    if not isinstance(inputs_df, pd.DataFrame) or inputs_df.empty:
-        raise ValueError("Empty inputs table.")
-
-    for col in ("Tipo", "Contenido", "Etiqueta", "Fuente"):
-        if col not in inputs_df.columns:
-            inputs_df[col] = ""
-
-    brand = _brand(inputs_df)
-    brief = _brief_desc(inputs_df)
-    buyer = _buyer_persona(inputs_df)
-    lex = _lexico(inputs_df)
-    variations = _variations(inputs_df)
-    benefits = _benefits(inputs_df)
-    emotions = _emotions(inputs_df)
-    cores = _core_tokens(inputs_df)
-    attrs_all = _attributes(inputs_df, variations)
-    attrs_ranked = _rank_attributes_by_benefits(attrs_all, benefits)
-
-    prompt = PROMPT_MASTER_JSON(
-        brand=brand,
-        brief_description=brief,
-        core_tokens=cores,
-        attributes=attrs_ranked,
-        variations=variations,
-        benefits=benefits,
-        emotions=emotions,
-        buyer_persona=buyer,
-        lexico=lex,
-    )
-
-    raw = _openai_chat(model, prompt)
+def _cheap_llm_call(system_prompt: str, user_prompt: str, model: Optional[str], max_tokens: Optional[int], temperature: Optional[float]) -> str:
+    """Envuelve una llamada simple a OpenAI ChatCompletions; devuelve texto o ''. No rompe si falta API."""
+    mdl = model or os.environ.get("OPENAI_MODEL_COPY", "gpt-4o-mini")
+    mtok = int(max_tokens or os.environ.get("OPENAI_MAX_TOKENS_COPY", "1400"))
+    temp = float(temperature or os.environ.get(
+        "OPENAI_TEMPERATURE_COPY", "0.3"))
     try:
-        data = json.loads(raw)
+        from openai import OpenAI
+        client = OpenAI()
+        resp = client.chat.completions.create(
+            model=mdl,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=temp,
+            max_tokens=mtok,
+        )
+        return (resp.choices[0].message.content or "").strip()
     except Exception:
-        raw2 = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=re.S)
-        data = json.loads(raw2)
+        return ""
 
-    product_name = _extract_product_name(cores)
-    fixed_titles = []
-    for v in variations if variations else [""]:
-        v_clean = _clean_title_value_chunks(v)
-        attrs_use = attrs_ranked[:5]
-        desktop = _compose_title(brand, product_name, attrs_use, v_clean)
-        desktop = _fit_length_desktop(desktop)
-        mobile = _fit_length_mobile(desktop, product_name)
-        fixed_titles.append({"variation": v_clean or "",
-                            "desktop": desktop, "mobile": mobile})
 
-    data["titles"] = fixed_titles
-    data.setdefault("bullets", [])
-    data.setdefault("description", "")
-    data.setdefault("search_terms", "")
+def _parse_json_field(txt: str, field: str, fallback):
+    try:
+        j = json.loads(txt)
+        val = j.get(field)
+        if val is None:
+            return fallback
+        return val
+    except Exception:
+        return fallback
 
-    return data
+# -------------------------------------------------------------
+# Builders determinísticos de respaldo (si use_ai=False o JSON falló)
+# -------------------------------------------------------------
+
+
+def _fallback_title(inputs: Dict[str, Any]) -> str:
+    brand = next((t for t in inputs.get("core_tokens", [])
+                 if len(t.split()) <= 2), "")
+    base = next(iter(inputs.get("head_phrases", [])), "")
+    attr = next(iter(inputs.get("attributes", [])), "")
+    var = next(iter(inputs.get("variations", [])), "")
+    # Ensamble simple y seguro; sanitizer recorta a rango final
+    parts = [p for p in [brand, base, attr, var] if p]
+    s = " | ".join(parts)
+    return re.sub(r"\s+", " ", s).strip()[:200]
+
+
+def _fallback_bullets(inputs: Dict[str, Any]) -> List[str]:
+    attrs = inputs.get("attributes", [])[:5]
+    bens = inputs.get("benefits", [])[:5]
+    out = []
+    for i in range(5):
+        a = attrs[i] if i < len(attrs) else (attrs[0] if attrs else "Feature")
+        b = bens[i] if i < len(bens) else (bens[0] if bens else "Benefit")
+        out.append(f"{a}: {b}")
+    return out
+
+
+def _fallback_description(inputs: Dict[str, Any]) -> str:
+    base = " ".join(inputs.get("head_phrases", [])[:5])
+    persona = inputs.get("buyer_persona", "")
+    bens = "; ".join(inputs.get("benefits", [])[:8])
+    attrs = "; ".join(inputs.get("attributes", [])[:8])
+    return f"{base}. For {persona}. Benefits: {bens}. Attributes: {attrs}."
+
+
+def _fallback_backend(inputs: Dict[str, Any]) -> str:
+    # Junta tokens y variaciones en una lista simple separada por espacios (sin comas)
+    toks = inputs.get("core_tokens", [])[:40] + \
+        inputs.get("variations", [])[:20]
+    toks = [re.sub(r"[,;]+", " ", t).strip() for t in toks if t.strip()]
+    joined = " ".join(_unique(toks))
+    # backend son bytes sin espacios contados; aquí solo devolvemos texto base
+    return joined
+
+# -------------------------------------------------------------
+# API principal
+# -------------------------------------------------------------
+
+
+def lafuncionqueejecuta_listing_copywrite(
+    inputs_df: pd.DataFrame,
+    use_ai: bool = True,
+    model: Optional[str] = None,
+    max_tokens: Optional[int] = None,
+    temperature: Optional[float] = None,
+    cost_saver: bool = True,
+    rules: Optional[Dict[str, Any]] = None,  # <= reglas parseadas desde PDFs
+) -> Dict[str, Any]:
+    """
+    Genera Title, 5 Bullets, Description y Backend en 4 llamadas separadas.
+    Cumple el contrato: SOLO `inputs_para_listing` + `rules`.
+    """
+    # 1) Proyección desde la tabla
+    inputs = _collect_inputs(inputs_df, cost_saver=cost_saver)
+
+    # 2) Prompts por etapa
+    rules = rules or {}
+    sys_prompt = "You are a senior Amazon listing copy editor that outputs ONLY JSON as specified."
+
+    title, bullets, description, backend = "", [], "", ""
+
+    if use_ai:
+        # ---- TITLE ----
+        p_title = build_prompt_title(inputs, rules)
+        t_resp = _cheap_llm_call(
+            sys_prompt, p_title, model, max_tokens, temperature)
+        title = _parse_json_field(t_resp, "title", _fallback_title(inputs))
+
+        # ---- BULLETS ----
+        p_bul = build_prompt_bullets(inputs, rules)
+        b_resp = _cheap_llm_call(
+            sys_prompt, p_bul, model, max_tokens, temperature)
+        bullets = _parse_json_field(
+            b_resp, "bullets", _fallback_bullets(inputs))
+        if not isinstance(bullets, list):
+            bullets = _fallback_bullets(inputs)
+
+        # ---- DESCRIPTION ----
+        p_desc = build_prompt_description(inputs, rules)
+        d_resp = _cheap_llm_call(
+            sys_prompt, p_desc, model, max_tokens, temperature)
+        description = _parse_json_field(
+            d_resp, "description", _fallback_description(inputs))
+
+        # ---- BACKEND ----
+        p_back = build_prompt_backend(inputs, rules)
+        s_resp = _cheap_llm_call(
+            sys_prompt, p_back, model, max_tokens, temperature)
+        backend = _parse_json_field(
+            s_resp, "search_terms", _fallback_backend(inputs))
+    else:
+        # Sin IA: usa fallbacks determinísticos
+        title = _fallback_title(inputs)
+        bullets = _fallback_bullets(inputs)
+        description = _fallback_description(inputs)
+        backend = _fallback_backend(inputs)
+
+    # 3) Sanitizer EN (aplica hard limits de longitudes/normativas)
+    draft = {
+        "title": title or "",
+        "bullets": bullets or [],
+        "description": description or "",
+        "search_terms": backend or "",
+    }
+    return lafuncionqueejecuta_listing_sanitizer_en(draft)

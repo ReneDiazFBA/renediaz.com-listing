@@ -1,103 +1,136 @@
 # listing/app_listing_copywrite.py
-# UI: un botón → única llamada IA → títulos, bullets, descripción, backend.
-# Verifica OPENAI_API_KEY por entorno (sin st.secrets).
+# UI de Copywriting para la pestaña "Copywriting" del Dashboard.
+# Muestra Title, 5 Bullets, Description y Backend, con conteos exactos.
+# Backend: cuenta bytes ignorando espacios.
 
-import os
 import json
 import streamlit as st
 import pandas as pd
 
-from listing.funcional_listing_copywrite import (
-    generate_listing_copy,
-    compliance_report,
-)
+from listing.funcional_listing_copywrite import lafuncionqueejecuta_listing_copywrite
+
+# ---- Auto-load copy rules from code (so you don't need PDFs at runtime) ----
+try:
+    from listing.rules_listing_copywrite import COPY_RULES_GENERAL as _DEFAULT_COPY_RULES
+except Exception:
+    _DEFAULT_COPY_RULES = {}
+
+if "copy_rules" not in st.session_state or not st.session_state.get("copy_rules"):
+    st.session_state["copy_rules"] = _DEFAULT_COPY_RULES
+# ---------------------------------------------------------------------------
+
 
 
 def _get_inputs_df() -> pd.DataFrame:
     df = st.session_state.get("inputs_para_listing", pd.DataFrame())
-    return df if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    if not isinstance(df, pd.DataFrame):
+        return pd.DataFrame()
+    return df
+
+
+def _export_buttons(draft: dict):
+    col1, col2 = st.columns(2)
+    with col1:
+        st.download_button(
+            "⬇️ Descargar JSON",
+            data=json.dumps(draft, ensure_ascii=False, indent=2),
+            file_name="listing_draft_en.json",
+            mime="application/json",
+            use_container_width=True,
+        )
+    with col2:
+        st.download_button(
+            "⬇️ Backend Search Terms (.txt)",
+            data=draft.get("search_terms", ""),
+            file_name="backend_search_terms.txt",
+            mime="text/plain",
+            use_container_width=True,
+        )
 
 
 def _no_space_bytes_len(s: str) -> int:
+    """Cuenta bytes en UTF-8 ignorando espacios."""
     return len((s or "").replace(" ", "").encode("utf-8"))
 
 
 def mostrar_listing_copywrite(excel_data=None):
-    st.subheader("Copywriting (EN)")
+    st.subheader("Copywriting")
     st.caption(
-        "Generate Titles (desktop & mobile per variation), 5 Bullets, Description, and Backend in one AI call.")
-
-    # Prechequeo de API key por entorno
-    if not os.environ.get("OPENAI_API_KEY"):
-        st.error(
-            "Missing OPENAI_API_KEY environment variable. Set it before running.")
-        st.stop()
+        "Genera Title, Bullets, Description y Backend (EN) desde los inputs consolidados.")
 
     df_inputs = _get_inputs_df()
+
     if df_inputs.empty:
         st.warning(
-            "No hay inputs. Ve a Mercado → Cliente/Tabla para construir 'inputs_para_listing'.")
-        with st.expander("Ver inputs esperados", expanded=False):
+            "No hay inputs disponibles. Ve a **Mercado → Cliente / Tabla** para construir 'inputs_para_listing'.")
+        with st.expander("¿Qué debería ver aquí?", expanded=False):
             st.markdown(
-                "- Filas: **Marca**, **Descripción breve**, **Buyer persona**, "
-                "**Beneficio/Beneficio valorado/Ventaja**, **Emoción**, "
-                "**Atributo**, **Variación**, **Léxico editorial**, **SEO semántico/Core**."
+                "- Filas como **Nombre sugerido**, **Descripción breve**, **Beneficio**, **Atributo**, **Variación**, "
+                "**Emoción**, **Buyer persona**, **Léxico editorial**, y **Token Semántico** (Fuente: Clustering)."
             )
         return
 
-    with st.expander("View source inputs (debug)", expanded=False):
+    with st.expander("Ver inputs fuente (debug)", expanded=False):
         st.dataframe(df_inputs, use_container_width=True)
 
     st.divider()
-    model = st.selectbox("Model", ["gpt-4o-mini"],
-                         index=0, help="Lowest-cost for drafting.")
 
-    if st.button("Generate listing", type="primary", use_container_width=True):
+    # Controles
+    c1, c2 = st.columns([1, 2])
+    with c1:
+        use_ai = st.toggle("Use AI (cheap)", value=True,
+                           help="IA económica (gpt-4o-mini) si hay OPENAI_API_KEY. Si no, fallback 0$.")
+    with c2:
+        cost_saver = st.toggle(
+            "Cost saver", value=True, help="Recorta el prompt/inputs para abaratar pruebas.")
+
+    if st.button("Generate copy", type="primary", use_container_width=True):
         try:
-            draft = generate_listing_copy(df_inputs, model=model)
+            draft = lafuncionqueejecuta_listing_copywrite(
+                inputs_df=df_inputs,
+                use_ai=use_ai,
+                cost_saver=cost_saver,
+                rules=st.session_state.get("copy_rules"),
+            )
+            st.success("Borrador generado.")
             st.session_state["draft_listing"] = draft
-            st.success("Listing generated.")
         except Exception as e:
-            st.error(f"Error generating listing: {e}")
+            st.error(f"Error al generar copy: {e}")
             return
 
     draft = st.session_state.get("draft_listing", {})
     if not draft:
-        st.info("Press **Generate listing**.")
+        st.info("Aún no hay borrador. Haz clic en **Generate copy**.")
         return
 
-    st.markdown("### Titles (per variation)")
-    for t in draft.get("titles", []):
-        st.markdown(
-            f"**Variation:** {t.get('variation','(none)') or '(none)'}")
-        desk = t.get("desktop", "")
-        mobi = t.get("mobile", "")
-        st.code(desk)
-        st.caption(f"Desktop length: {len(desk)} chars")
-        st.code(mobi)
-        st.caption(f"Mobile length: {len(mobi)} chars")
+    # --- Render del borrador ---
+    st.markdown("### Draft (EN)")
 
-    st.markdown("### Bullets (5)")
+    # Title
+    st.markdown("**Title**")
+    title = draft.get("title", "")
+    st.code(title)
+    st.caption(f"Length: {len(title)} chars")
+
+    # Bullets
+    st.markdown("**Bullets (5)**")
     bullets = draft.get("bullets", []) or []
     for i, b in enumerate(bullets[:5], 1):
         st.write(f"{i}. {b}")
         st.caption(f"Length: {len(b)} chars")
 
-    st.markdown("### Description")
-    desc = draft.get("description", "")
-    st.write(desc, unsafe_allow_html=True)
-    st.caption(f"Length: {len(desc)} chars")
+    # Description
+    st.markdown("**Description**")
+    description = draft.get("description", "")
+    st.write(description)
+    st.caption(f"Length: {len(description)} chars")
 
-    st.markdown("### Backend Search Terms")
+    # Backend
+    st.markdown("**Backend Search Terms**")
     backend = draft.get("search_terms", "")
     st.code(backend)
-    st.caption(f"Bytes (no spaces): {_no_space_bytes_len(backend)}")
+    backend_bytes = _no_space_bytes_len(backend)
+    st.caption(f"Length: {backend_bytes} bytes (spaces not counted)")
 
     st.divider()
-    rep = compliance_report(draft)
-    if rep["issues"]:
-        st.error("Issues found:")
-        for it in rep["issues"]:
-            st.write(f"- {it}")
-    else:
-        st.success("All checks passed.")
+    _export_buttons(draft)
