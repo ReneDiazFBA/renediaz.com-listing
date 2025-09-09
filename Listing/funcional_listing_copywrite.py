@@ -1,21 +1,22 @@
 # listing/funcional_listing_copywrite.py
-# Orquestador IA en MODO CONTRATO ESTRICTO:
-# - Usa OpenAI (modelo por defecto: gpt-4o-mini; cambia con LISTING_COPY_MODEL).
-# - SOLO usa las ROWS (inputs_para_listing) y TUS RULES literales.
-# - No agrega reglas propias, no rellena, no recorta, no corrige.
-# - Devuelve:
-#   {
-#     "title":   { "parent":{"desktop","mobile"}, "<var>":{"desktop","mobile"}, ... },
-#     "bullets": { "parent":[b1..b5], "<var>":[b1..b5], ... },
-#     "description": str,
-#     "search_terms": str
-#   }
-# - Mantiene alias lafuncionqueejecuta_listing_copywrite.
+# Orquestador IA por ETAPA (title / bullets / description / backend)
+# - Usa EXCLUSIVAMENTE la tabla inputs_para_listing (Tipo, Etiqueta, Contenido).
+# - Para TÍTULOS llama al prompt estricto definido en prompts_listing_copywrite.py (SOP RD + Brief General).
+# - Bullets/Description/Backend quedan cableados a sus placeholders (no invento reglas).
+# - Mantiene alias lafuncionqueejecuta_listing_copywrite para compatibilidad.
 
 import os
 import re
 import json
 import pandas as pd
+
+# Prompts por etapa (títulos estrictos + placeholders para las otras)
+from listing.prompts_listing_copywrite import (
+    prompt_titles_json,
+    prompt_bullets_json,
+    prompt_description_json,
+    prompt_backend_json,
+)
 
 # -------------------------- JSON robusto --------------------------
 
@@ -51,16 +52,11 @@ def _extract_first_json(txt: str) -> str:
     return ""
 
 
-def _parse_json_field(txt: str, field: str, fallback):
-    candidate = _extract_first_json(txt)
-    if not candidate:
-        return fallback
-    try:
-        j = json.loads(candidate)
-        val = j.get(field)
-        return fallback if val is None else val
-    except Exception:
-        return fallback
+def _parse_json(txt: str) -> dict:
+    cand = _extract_first_json(txt)
+    if not cand:
+        raise ValueError("La IA no devolvió JSON parseable.")
+    return json.loads(cand)
 
 
 # -------------------------- OpenAI --------------------------
@@ -82,40 +78,104 @@ def _require_openai():
     return _openai_client
 
 
-def _chat_json(system_prompt: str, user_prompt: str) -> dict:
+def _chat_json(user_prompt: str) -> dict:
     client = _require_openai()
     resp = client.chat.completions.create(
         model=_MODEL_DEFAULT,
         temperature=_TEMPERATURE,
         max_tokens=_MAXTOK,
         messages=[
-            {"role": "system", "content": system_prompt},
+            # Sistema minimalista: no agrega reglas ni reformas. El prompt ya contiene SOP/Brief/Inputs.
+            {"role": "system", "content": "Return ONLY raw JSON. No prose, no markdown, no code fences."},
             {"role": "user",   "content": user_prompt},
         ],
     )
     content = (resp.choices[0].message.content or "").strip()
-    candidate = _extract_first_json(content)
-    if not candidate:
-        raise ValueError("La IA no devolvió JSON parseable.")
-    return json.loads(candidate)
+    return _parse_json(content)
+
 
 # -------------------------- Helpers de datos --------------------------
+REQ_COLS = ["Tipo", "Etiqueta", "Contenido"]
 
 
 def _to_records(df: pd.DataFrame, budgeted: bool = True):
-    cols = ["Tipo", "Etiqueta", "Contenido"]
-    miss = [c for c in cols if c not in df.columns]
+    miss = [c for c in REQ_COLS if c not in df.columns]
     if miss:
         raise ValueError(f"Faltan columnas en inputs_df: {miss}")
-    df2 = df[cols].copy()
-    if budgeted and len(df2) > 400:
+    df2 = df[REQ_COLS].copy()
+    # cost_saver: recorta de forma simple por tipo si hay demasiadas filas
+    if budgeted and len(df2) > 800:
         df2 = df2.groupby("Tipo", group_keys=False).head(
-            120).reset_index(drop=True)
-    for c in cols:
+            200).reset_index(drop=True)
+    for c in REQ_COLS:
         df2[c] = df2[c].astype(str)
     return df2.to_dict(orient="records")
 
-# -------------------------- Variations --------------------------
+
+def _collect(df_records):
+    """
+    Proyección a listas para prompts:
+      - head_phrases: candidatos de marca/nombre semilla (tomados de filas que suelen contener encabezados/nombre sugerido/marca).
+      - core_tokens:  Tipo="SEO semántico" & Etiqueta="Core"
+      - attributes:    Tipo="Atributo" → Contenido (RAW)
+      - variations:    Tipo="Variación" → Contenido
+      - benefits:      Tipo="Beneficio" → Contenido
+      - emotions:      Tipo="Emoción" → Contenido
+      - buyer_persona: Tipo="Buyer persona" (string unificada)
+      - lexico:        Tipo="Léxico editorial" (string unificada)
+    NOTA: No se inventa nada; solo se agrupan contenidos de la tabla.
+    """
+    head_phrases = []
+    core_tokens = []
+    attributes = []
+    variations = []
+    benefits = []
+    emotions = []
+    buyer_list = []
+    lexico_list = []
+
+    for r in df_records:
+        tipo = (r.get("Tipo") or "").strip().lower()
+        etiq = (r.get("Etiqueta") or "").strip().lower()
+        cont = (r.get("Contenido") or "").strip()
+
+        if not cont:
+            continue
+
+        if tipo in {"marca", "nombre sugerido", "head phrase", "head_phrase", "head phrases"}:
+            head_phrases.append(cont)
+        elif tipo == "seo semántico" and etiq == "core":
+            core_tokens.append(cont)
+        elif tipo == "atributo":
+            attributes.append(cont)
+        elif tipo == "variación":
+            variations.append(cont)
+        elif tipo == "beneficio":
+            benefits.append(cont)
+        elif tipo == "emoción":
+            emotions.append(cont)
+        elif tipo == "buyer persona":
+            buyer_list.append(cont)
+        elif tipo == "léxico editorial":
+            lexico_list.append(cont)
+
+    buyer_persona = " | ".join(dict.fromkeys(buyer_list)) if buyer_list else ""
+    lexico = " | ".join(dict.fromkeys(lexico_list)) if lexico_list else ""
+
+    # dedupe conservando orden
+    def _dedupe(seq): return list(dict.fromkeys(seq))
+    return {
+        "head_phrases": _dedupe(head_phrases),
+        "core_tokens":  _dedupe(core_tokens),
+        "attributes":   _dedupe(attributes),
+        "variations":   _dedupe(variations),
+        "benefits":     _dedupe(benefits),
+        "emotions":     _dedupe(emotions),
+        "buyer_persona": buyer_persona,
+        "lexico":        lexico,
+    }
+
+# -------------------------- Variations (slug) --------------------------
 
 
 def _slugify_variation_value(s: str) -> str:
@@ -126,71 +186,12 @@ def _slugify_variation_value(s: str) -> str:
     return s or "value"
 
 
-def _get_variations(rows: list):
-    keys, vals = [], []
-    for r in rows:
-        if str(r.get("Tipo", "")).strip().lower() == "variación":
-            raw = str(r.get("Contenido", "")).strip()
-            if raw:
-                key = _slugify_variation_value(raw)
-                if key not in keys:
-                    keys.append(key)
-                    vals.append(raw)
-    return keys, vals
-
-# -------------------------- Schemas --------------------------
-
-
-def _build_title_schema_dict(var_keys: list) -> dict:
-    t = {"parent": {"desktop": "...", "mobile": "..."}}
-    for vk in var_keys:
-        t[vk] = {"desktop": "...", "mobile": "..."}
-    return {"title": t}
-
-
-def _build_bullets_schema_dict(var_keys: list) -> dict:
-    base = ["b1", "b2", "b3", "b4", "b5"]
-    b = {"parent": base}
-    for vk in var_keys:
-        b[vk] = base
-    return {"bullets": b}
-
-# -------------------------- Prompt (estricto: solo tus reglas + rows) --------------------------
-
-
-def _stage_prompt(stage: str, rules_stage: dict, rows: list, var_keys: list = None, var_values: list = None) -> str:
-    var_keys = var_keys or []
-    # schema solo define la forma del JSON esperado; no añade reglas
-    if stage == "title":
-        schema_dict = _build_title_schema_dict(var_keys)
-    elif stage == "bullets":
-        schema_dict = _build_bullets_schema_dict(var_keys)
-    elif stage == "description":
-        schema_dict = {"description": "string"}
-    elif stage == "backend":
-        schema_dict = {"search_terms": "string"}
-    else:
-        raise ValueError(f"stage desconocido: {stage}")
-
-    rules_text = json.dumps(rules_stage or {}, ensure_ascii=False)
-
-    return (
-        "You are an Amazon Listing Copywriter executing a binding contract of rules.\n"
-        "CRITICAL:\n"
-        "- Obey RULES exactly as written (verbatim). Do NOT summarize or reinterpret.\n"
-        "- Use ONLY the information present in ROWS as factual source. If a detail is not in ROWS, do NOT include it.\n"
-        "- Return ONLY raw JSON conforming to the SCHEMA. No prose, no markdown, no code fences.\n"
-        "- If RULES specify formatting, casing, tokens or structure, follow them literally.\n"
-        "- If any conflict arises, prefer RULES and omit anything not guaranteed by ROWS.\n\n"
-        f"SCHEMA (JSON):\n{json.dumps(schema_dict, ensure_ascii=False, indent=2)}\n\n"
-        f"RULES (verbatim):\n{rules_text}\n\n"
-        f"ROWS (sole source of truth; Tipo/Etiqueta/Contenido):\n{json.dumps(rows, ensure_ascii=False)}\n"
-    ).strip()
-
-# -------------------------- Coerción de forma (sin modificar contenido) --------------------------
-
-
-def _coerce_titles_shape(j_title: dict, var_keys: list) -> dict:
+def _coerce_titles_shape(j_title: dict, variations_raw: list) -> dict:
+    """
+    Espera JSON con clave "title" y estructura:
+      { "parent": {"desktop","mobile"}, "<var-slug>": {"desktop","mobile"}, ... }
+    Si falta alguna clave, se rellena con "" (no se modifica contenido).
+    """
     root = j_title.get("title") if isinstance(j_title, dict) else j_title
     out = {}
     if not isinstance(root, dict):
@@ -199,15 +200,27 @@ def _coerce_titles_shape(j_title: dict, var_keys: list) -> dict:
     def _pair(d):
         if not isinstance(d, dict):
             d = {}
-        return {"desktop": "" if d.get("desktop") is None else str(d.get("desktop")),
-                "mobile":  "" if d.get("mobile") is None else str(d.get("mobile"))}
+        return {
+            "desktop": "" if d.get("desktop") is None else str(d.get("desktop")),
+            "mobile":  "" if d.get("mobile") is None else str(d.get("mobile")),
+        }
+
     out["parent"] = _pair(root.get("parent"))
-    for vk in var_keys:
+
+    # garantizar todas las variaciones detectadas desde tabla estén presentes
+    for raw in variations_raw:
+        vk = _slugify_variation_value(raw)
         out[vk] = _pair(root.get(vk))
+
     return out
 
 
-def _coerce_bullets_shape(j_bul: dict, var_keys: list) -> dict:
+def _coerce_bullets_shape(j_bul: dict, variations_raw: list) -> dict:
+    """
+    Formato esperado:
+      { "bullets": { "parent":[b1..b5], "<var>":[b1..b5], ... } }
+    No copiamos ni recortamos; si faltan posiciones, se rellenan con "".
+    """
     root = j_bul.get("bullets") if isinstance(j_bul, dict) else j_bul
     out = {}
 
@@ -216,85 +229,100 @@ def _coerce_bullets_shape(j_bul: dict, var_keys: list) -> dict:
         if len(lst) < 5:
             lst += [""]*(5-len(lst))
         return ["" if x is None else str(x) for x in lst[:5]]
+
     if isinstance(root, dict):
         out["parent"] = _five(root.get("parent"))
-        for vk in var_keys:
+        for raw in variations_raw:
+            vk = _slugify_variation_value(raw)
             out[vk] = _five(root.get(vk))
     elif isinstance(root, list):
         out["parent"] = _five(root)
-        for vk in var_keys:
+        for raw in variations_raw:
+            vk = _slugify_variation_value(raw)
             out[vk] = _five([])
     else:
         out["parent"] = _five([])
-        for vk in var_keys:
+        for raw in variations_raw:
+            vk = _slugify_variation_value(raw)
             out[vk] = _five([])
     return out
 
-# -------------------------- Orquestación (una sola pasada, sin “arreglos”) --------------------------
+# -------------------------- Ejecución por ETAPA --------------------------
 
 
-def run_listing_copywrite(inputs_df, use_ai=True, cost_saver=True, rules=None):
+def run_listing_stage(inputs_df: pd.DataFrame, stage: str, cost_saver: bool = True, rules: dict | None = None):
     """
-    return:
-    {
-      "title":   { "parent":{"desktop","mobile"}, "<var>":{"desktop","mobile"}, ... },
-      "bullets": { "parent":[b1..b5], "<var>":[b1..b5], ... },
-      "description": str,
-      "search_terms": str
-    }
+    Genera SOLO una etapa: 'title' | 'bullets' | 'description' | 'backend'
+    No agrega reglas propias. Usa el prompt de esa etapa tal cual esté definido.
     """
-    if not use_ai:
-        raise ValueError("use_ai=False no soportado aquí. Activa 'Use AI'.")
     if not isinstance(inputs_df, pd.DataFrame) or inputs_df.empty:
         raise ValueError(
             "inputs_df vacío; construye inputs_para_listing primero.")
 
     rows = _to_records(inputs_df, budgeted=cost_saver)
-    rules = rules or {}
+    proj = _collect(rows)
 
-    var_keys, var_values = _get_variations(rows)
+    if stage == "title":
+        up = prompt_titles_json(
+            proj["head_phrases"], proj["core_tokens"], proj["attributes"], proj["variations"],
+            proj["benefits"], proj["emotions"], proj["buyer_persona"], proj["lexico"]
+        )
+        j = _chat_json(up)
+        titles = _coerce_titles_shape(j, proj["variations"])
+        return {"title": titles}
 
-    sys_prompt = (
-        "Return ONLY raw JSON. No prose, no markdown, no code fences. "
-        "Follow the provided SCHEMA exactly. Use only RULES and ROWS."
-    )
+    elif stage == "bullets":
+        up = prompt_bullets_json(
+            proj["head_phrases"], proj["core_tokens"], proj["attributes"], proj["variations"],
+            proj["benefits"], proj["emotions"], proj["buyer_persona"], proj["lexico"]
+        )
+        j = _chat_json(up)
+        bullets = _coerce_bullets_shape(j, proj["variations"])
+        return {"bullets": bullets}
 
-    # TITLE
-    up_title = _stage_prompt("title", rules.get(
-        "title"), rows, var_keys=var_keys, var_values=var_values)
-    j_title = _chat_json(sys_prompt, up_title)
-    title_map = _coerce_titles_shape(j_title, var_keys)
+    elif stage == "description":
+        up = prompt_description_json(
+            proj["head_phrases"], proj["core_tokens"], proj["attributes"], proj["variations"],
+            proj["benefits"], proj["emotions"], proj["buyer_persona"], proj["lexico"]
+        )
+        j = _chat_json(up)
+        # j puede ser {"description": "..."} o anidado
+        desc = j.get("description") if isinstance(j, dict) else ""
+        if desc is None:
+            desc = ""
+        return {"description": str(desc)}
 
-    # BULLETS
-    up_bul = _stage_prompt("bullets", rules.get(
-        "bullets"), rows, var_keys=var_keys, var_values=var_values)
-    j_bul = _chat_json(sys_prompt, up_bul)
-    bullets_map = _coerce_bullets_shape(j_bul, var_keys)
+    elif stage == "backend":
+        up = prompt_backend_json(
+            proj["head_phrases"], proj["core_tokens"], proj["attributes"], proj["variations"],
+            proj["benefits"], proj["emotions"], proj["buyer_persona"], proj["lexico"]
+        )
+        j = _chat_json(up)
+        search = j.get("search_terms") if isinstance(j, dict) else ""
+        if search is None:
+            search = ""
+        return {"search_terms": str(search)}
 
-    # DESCRIPTION
-    up_desc = _stage_prompt("description", rules.get(
-        "description"), rows, var_keys=var_keys, var_values=var_values)
-    j_desc = _chat_json(sys_prompt, up_desc)
-    description = j_desc.get("description") if isinstance(j_desc, dict) else _parse_json_field(
-        json.dumps(j_desc, ensure_ascii=False), "description", "")
-    description = "" if description is None else str(description)
+    else:
+        raise ValueError(f"stage desconocido: {stage}")
 
-    # BACKEND
-    up_back = _stage_prompt("backend", rules.get(
-        "backend"), rows, var_keys=var_keys, var_values=var_values)
-    j_back = _chat_json(sys_prompt, up_back)
-    search_terms = j_back.get("search_terms") if isinstance(j_back, dict) else _parse_json_field(
-        json.dumps(j_back, ensure_ascii=False), "search_terms", "")
-    search_terms = "" if search_terms is None else str(search_terms)
+# -------------------------- Batch opcional (compatibilidad) --------------------------
 
-    return {
-        "title": title_map,
-        "bullets": bullets_map,
-        "description": description,
-        "search_terms": search_terms,
-    }
 
-# -------------------------- Alias compat --------------------------
+def run_listing_copywrite(inputs_df, use_ai=True, cost_saver=True, rules=None):
+    """
+    Compat: genera las 4 etapas en secuencia (solo si lo necesitas).
+    """
+    if not use_ai:
+        raise ValueError("use_ai=False no soportado aquí. Activa 'Use AI'.")
+    draft = {}
+    for stg in ("title", "bullets", "description", "backend"):
+        part = run_listing_stage(
+            inputs_df, stg, cost_saver=cost_saver, rules=rules)
+        draft.update(part)
+    return draft
+
+# Alias compat
 
 
 def lafuncionqueejecuta_listing_copywrite(inputs_df, use_ai=True, cost_saver=True, rules=None):
