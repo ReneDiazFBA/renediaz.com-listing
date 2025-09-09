@@ -20,7 +20,6 @@ if "copy_rules" not in st.session_state or not st.session_state.get("copy_rules"
 # ---------------------------------------------------------------------------
 
 
-
 def _get_inputs_df() -> pd.DataFrame:
     df = st.session_state.get("inputs_para_listing", pd.DataFrame())
     if not isinstance(df, pd.DataFrame):
