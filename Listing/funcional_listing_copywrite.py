@@ -116,16 +116,16 @@ def _to_records(df: pd.DataFrame, budgeted: bool = True):
 
 def _collect(df_records):
     """
-    Proyección a listas para prompts:
-      - head_phrases: candidatos de marca/nombre semilla (tomados de filas que suelen contener encabezados/nombre sugerido/marca).
-      - core_tokens:  Tipo="SEO semántico" & Etiqueta="Core"
-      - attributes:    Tipo="Atributo" → Contenido (RAW)
-      - variations:    Tipo="Variación" → Contenido
-      - benefits:      Tipo="Beneficio" → Contenido
-      - emotions:      Tipo="Emoción" → Contenido
-      - buyer_persona: Tipo="Buyer persona" (string unificada)
-      - lexico:        Tipo="Léxico editorial" (string unificada)
-    NOTA: No se inventa nada; solo se agrupan contenidos de la tabla.
+    PROYECCIÓN ESTRICTA A SOP:
+      - head_phrases: 'Marca' y 'Nombre sugerido' (tal cual tabla).
+      - core_tokens : SOLO filas con Tipo == 'SEO semántico' (con tilde) Y Etiqueta == 'Core' (con C mayúscula en la tabla).
+      - attributes  : SOLO Tipo == 'Atributo' → Contenido (RAW).
+      - variations  : SOLO Tipo == 'Variación' → Contenido (RAW).
+      - benefits    : SOLO Tipo == 'Beneficio' → Contenido.
+      - emotions    : SOLO Tipo == 'Emoción' → Contenido.
+      - buyer_persona: SOLO Tipo == 'Buyer persona' → concatenado.
+      - lexico      : SOLO Tipo == 'Léxico editorial' → concatenado.
+    NO se aceptan sinónimos ni variantes fuera de SOP.
     """
     head_phrases = []
     core_tokens = []
@@ -137,35 +137,49 @@ def _collect(df_records):
     lexico_list = []
 
     for r in df_records:
-        tipo = (r.get("Tipo") or "").strip().lower()
-        etiq = (r.get("Etiqueta") or "").strip().lower()
+        tipo_raw = (r.get("Tipo") or "").strip()
+        etiq_raw = (r.get("Etiqueta") or "").strip()
         cont = (r.get("Contenido") or "").strip()
-
         if not cont:
             continue
 
-        if tipo in {"marca", "nombre sugerido", "head phrase", "head_phrase", "head phrases"}:
+        # ESTRICTO a SOP: comparar exacto contra los literales de tu tabla
+        if tipo_raw == "Marca":
             head_phrases.append(cont)
-        elif tipo == "seo semántico" and etiq == "core":
+
+        elif tipo_raw == "Nombre sugerido":
+            head_phrases.append(cont)
+
+        elif tipo_raw == "SEO semántico" and etiq_raw == "Core":
             core_tokens.append(cont)
-        elif tipo == "atributo":
+
+        elif tipo_raw == "Atributo":
             attributes.append(cont)
-        elif tipo == "variación":
+
+        elif tipo_raw == "Variación":
             variations.append(cont)
-        elif tipo == "beneficio":
+
+        elif tipo_raw == "Beneficio":
             benefits.append(cont)
-        elif tipo == "emoción":
+
+        elif tipo_raw == "Emoción":
             emotions.append(cont)
-        elif tipo == "buyer persona":
+
+        elif tipo_raw == "Buyer persona":
             buyer_list.append(cont)
-        elif tipo == "léxico editorial":
+
+        elif tipo_raw == "Léxico editorial":
             lexico_list.append(cont)
 
-    buyer_persona = " | ".join(dict.fromkeys(buyer_list)) if buyer_list else ""
-    lexico = " | ".join(dict.fromkeys(lexico_list)) if lexico_list else ""
+        # Todo lo que NO esté en SOP se ignora deliberadamente.
 
     # dedupe conservando orden
-    def _dedupe(seq): return list(dict.fromkeys(seq))
+    def _dedupe(seq):
+        return list(dict.fromkeys(seq))
+
+    buyer_persona = " | ".join(_dedupe(buyer_list)) if buyer_list else ""
+    lexico = " | ".join(_dedupe(lexico_list)) if lexico_list else ""
+
     return {
         "head_phrases": _dedupe(head_phrases),
         "core_tokens":  _dedupe(core_tokens),
@@ -176,6 +190,7 @@ def _collect(df_records):
         "buyer_persona": buyer_persona,
         "lexico":        lexico,
     }
+
 
 # -------------------------- Variations (slug) --------------------------
 
