@@ -9,6 +9,8 @@ import os
 import re
 import json
 import pandas as pd
+from typing import Optional
+
 
 # Prompts por etapa (títulos estrictos + placeholders para las otras)
 from listing.prompts_listing_copywrite import (
@@ -250,7 +252,7 @@ def _coerce_bullets_shape(j_bul: dict, variations_raw: list) -> dict:
 # -------------------------- Ejecución por ETAPA --------------------------
 
 
-def run_listing_stage(inputs_df: pd.DataFrame, stage: str, cost_saver: bool = True, rules: dict | None = None):
+def run_listing_stage(inputs_df: pd.DataFrame, stage: str, cost_saver: bool = True, rules: Optional[dict] = None):
     """
     Genera SOLO una etapa: 'title' | 'bullets' | 'description' | 'backend'
     No agrega reglas propias. Usa el prompt de esa etapa tal cual esté definido.
