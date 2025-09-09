@@ -107,16 +107,52 @@ def mostrar_listing_copywrite(excel_data=None):
 
     # Title
     st.markdown("**Title**")
-    title = draft.get("title", "")
-    st.code(title)
-    st.caption(f"Length: {len(title)} chars")
+    title_data = draft.get("title", "")
+    if isinstance(title_data, dict):
+        st.markdown("**Parent**")
+        st.caption(
+            f"Desktop ({len(title_data.get('parent',{}).get('desktop',''))} chars)")
+        st.code(title_data.get("parent", {}).get("desktop", ""))
+        st.caption(
+            f"Mobile ({len(title_data.get('parent',{}).get('mobile',''))} chars)")
+        st.code(title_data.get("parent", {}).get("mobile", ""))
+        var_keys = [k for k in title_data.keys() if k != "parent"]
+        if var_keys:
+            st.markdown("**Variations**")
+        for vk in var_keys:
+            st.markdown(f"- **{vk}**")
+            st.caption(
+                f"Desktop ({len(title_data[vk].get('desktop',''))} chars)")
+            st.code(title_data[vk].get("desktop", ""))
+            st.caption(
+                f"Mobile ({len(title_data[vk].get('mobile',''))} chars)")
+            st.code(title_data[vk].get("mobile", ""))
+    else:
+        st.code(title_data)
+        st.caption(f"Length: {len(title_data)} chars")
 
     # Bullets
     st.markdown("**Bullets (5)**")
-    bullets = draft.get("bullets", []) or []
-    for i, b in enumerate(bullets[:5], 1):
-        st.write(f"{i}. {b}")
-        st.caption(f"Length: {len(b)} chars")
+    bullets_data = draft.get("bullets", [])
+    if isinstance(bullets_data, dict):
+        st.markdown("**Parent**")
+        parent = bullets_data.get("parent", []) or []
+        for i, b in enumerate(parent[:5], 1):
+            st.write(f"{i}. {b}")
+            st.caption(f"Length: {len(b)} chars")
+        var_keys = [k for k in bullets_data.keys() if k != "parent"]
+        if var_keys:
+            st.markdown("**Variations**")
+        for vk in var_keys:
+            st.markdown(f"- **{vk}**")
+            vlist = bullets_data.get(vk, []) or []
+            for i, b in enumerate(vlist[:5], 1):
+                st.write(f"{i}. {b}")
+                st.caption(f"Length: {len(b)} chars")
+    else:
+        for i, b in enumerate(bullets_data[:5], 1):
+            st.write(f"{i}. {b}")
+            st.caption(f"Length: {len(b)} chars")
 
     # Description
     st.markdown("**Description**")
