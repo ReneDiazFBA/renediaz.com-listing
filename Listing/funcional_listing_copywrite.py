@@ -148,7 +148,7 @@ def _collect(df_records):
             head_phrases.append(cont)
 
         elif tipo_raw == "Nombre sugerido":
-            head_phrases.append(cont)
+            pass
 
         elif tipo_raw == "SEO semántico" and etiq_raw == "Core":
             core_tokens.append(cont)
