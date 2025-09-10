@@ -1,12 +1,12 @@
 # listing/prompts_listing_copywrite.py
-# Prompts estrictos por etapa para la generación de listings de Amazon.
-# Este módulo NO agrega reglas propias: solo expresa TUS SOPs.
-# En caso de contradicción con guías generales de Amazon, TU SOP PREVALECE.
+# Prompts per stage for Amazon listings.
+# No hidden fallbacks; no placeholders that pretend to work.
+# In case of conflict, the local SOP (ReneDiaz.com) PREVAILS.
 
 from typing import List
 
 # ================================
-# BRIEF GENERAL (PDF integrado)
+# GENERAL GUIDELINES (integrated)
 # ================================
 GENERAL_GUIDELINES_BRIEF = r"""
 COPYWRITING GENERAL GUIDELINES FOR AMAZON PRODUCT LISTINGS — CONTRACT LAYER
@@ -66,7 +66,7 @@ NOTE ON PRECEDENCE
 """
 
 # ================================
-# TÍTULOS — SOP RD (ESTRICTO)
+# TITLES — SOP RD (STRICT)
 # ================================
 TITLES_SOP_STRICT = r"""
 SCOPE
@@ -91,6 +91,13 @@ DATA SOURCING (AUTHORIZED FIELDS ONLY — NO INVENTIONS)
 - Product Name:
   * EXCLUSIVELY from rows where Tipo == "SEO semántico" AND Etiqueta == "Core".
   * You MAY insert minimal stopwords for readability, but semantic tokens MUST come from those Core rows.
+  * CONSTRUCTION RULES (compose a readable noun phrase ONLY with the provided Core tokens):
+    - Build a grammatical phrase using ONLY the Core tokens + minimal function words (articles/prepositions/determiners) required for fluency in English.
+    - DO NOT introduce any new content words (nouns/adjectives) not present in Core.
+    - Normalize inflection (singular/plural) and order tokens in a natural English way.
+    - Example: from Core tokens ["stove","gas","burners","5"] → "gas stove with 5 burners".
+    - Keep marketplace conventions (e.g., unit placement, numeral formatting) but never add attributes not in Core.
+    - If Core tokens are insufficient to form a readable phrase, output an empty string "" (reject) for that field.
 - Attributes:
   * ONLY from rows where Tipo == "Atributo". Use the Contenido RAW, e.g., "5 Kg", not "Weight: 5 Kg".
   * NEVER use "use case" or any narrative text as attribute content.
@@ -153,8 +160,8 @@ def prompt_titles_json(
     lexico: str,
 ) -> str:
     """
-    Prompt ESTRICTO para TÍTULOS (SOP RD). Devuelve SOLO instrucciones para generar la clave "title"
-    con parent/child y desktop/mobile, respetando TODAS las normas.
+    Strict prompt for TITLES (SOP RD). Returns ONLY instructions to build the "title" key
+    with parent/child and desktop/mobile. No fallbacks, no extra rules.
     """
     return f"""{GENERAL_GUIDELINES_BRIEF}
 
@@ -184,24 +191,10 @@ INSTRUCTIONS:
 - Output ONLY the JSON for the "title" key; no other keys, no prose, no markdown, no fences.
 """
 
-
 # ============================================================
-# PLACEHOLDERS — BULLETS / DESCRIPTION / BACKEND (NO USAR)
+# Other stages — present but explicitly not implemented yet
+# (so imports don't break; no hidden placeholders)
 # ============================================================
-BULLETS_SOP_PLACEHOLDER = r"""
-PLACEHOLDER — DO NOT USE.
-This placeholder will be replaced with the strict SOP for bullets (headers in ALL CAPS + colon, 5 bullets, per-variation rules, etc.).
-"""
-
-DESCRIPTION_SOP_PLACEHOLDER = r"""
-PLACEHOLDER — DO NOT USE.
-This placeholder will be replaced with the strict SOP for description (2–3 paragraphs with <br><br>, avatar narrative, etc.).
-"""
-
-BACKEND_SOP_PLACEHOLDER = r"""
-PLACEHOLDER — DO NOT USE.
-This placeholder will be replaced with the strict SOP for backend search terms (byte count without spaces, dedupe vs surface copy, etc.).
-"""
 
 
 def prompt_bullets_json(
@@ -214,20 +207,8 @@ def prompt_bullets_json(
     buyer_persona: str,
     lexico: str,
 ) -> str:
-    return f"""{GENERAL_GUIDELINES_BRIEF}
-
-{BULLETS_SOP_PLACEHOLDER}
-
-(Inputs)
-head_phrases: {head_phrases}
-core_tokens:  {core_tokens}
-attributes:   {attributes}
-variations:   {variations}
-benefits:     {benefits}
-emotions:     {emotions}
-buyer_persona:{buyer_persona}
-lexico:       {lexico}
-"""
+    raise NotImplementedError(
+        "Bullets SOP is not integrated yet. This function is intentionally not implemented to avoid hidden fallbacks.")
 
 
 def prompt_description_json(
@@ -240,20 +221,8 @@ def prompt_description_json(
     buyer_persona: str,
     lexico: str,
 ) -> str:
-    return f"""{GENERAL_GUIDELINES_BRIEF}
-
-{DESCRIPTION_SOP_PLACEHOLDER}
-
-(Inputs)
-head_phrases: {head_phrases}
-core_tokens:  {core_tokens}
-attributes:   {attributes}
-variations:   {variations}
-benefits:     {benefits}
-emotions:     {emotions}
-buyer_persona:{buyer_persona}
-lexico:       {lexico}
-"""
+    raise NotImplementedError(
+        "Description SOP is not integrated yet. This function is intentionally not implemented to avoid hidden fallbacks.")
 
 
 def prompt_backend_json(
@@ -266,17 +235,5 @@ def prompt_backend_json(
     buyer_persona: str,
     lexico: str,
 ) -> str:
-    return f"""{GENERAL_GUIDELINES_BRIEF}
-
-{BACKEND_SOP_PLACEHOLDER}
-
-(Inputs)
-head_phrases: {head_phrases}
-core_tokens:  {core_tokens}
-attributes:   {attributes}
-variations:   {variations}
-benefits:     {benefits}
-emotions:     {emotions}
-buyer_persona:{buyer_persona}
-lexico:       {lexico}
-"""
+    raise NotImplementedError(
+        "Backend SOP is not integrated yet. This function is intentionally not implemented to avoid hidden fallbacks.")
