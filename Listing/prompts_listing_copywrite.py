@@ -65,9 +65,6 @@ NOTE ON PRECEDENCE
 - Where this brief and a local SOP conflict, the local SOP (ReneDiaz.com) PREVAILS for this system.
 """
 
-# ================================
-# TITLES — SOP RD (STRICT)
-# ================================
 TITLES_SOP_STRICT = r"""
 SCOPE
 - Titles must be generated ONLY from the structured table (rows with columns: Tipo, Etiqueta, Contenido).
@@ -98,6 +95,12 @@ DATA SOURCING (AUTHORIZED FIELDS ONLY — NO INVENTIONS)
     - Example: from Core tokens ["stove","gas","burners","5"] → "gas stove with 5 burners".
     - Keep marketplace conventions (e.g., unit placement, numeral formatting) but never add attributes not in Core.
     - If Core tokens are insufficient to form a readable phrase, output an empty string "" (reject) for that field.
+  * CAPITALIZATION (STRICT for Product Name):
+    - Apply Title Case to the Product Name.
+    - Keep common stopwords in lowercase **unless** they are the first or last word, or follow a hyphen “-” or slash “/”.
+    - Stopwords set (en): a, an, the, and, but, or, nor, for, so, yet, as, at, by, for, from, in, into, of, on, onto, over, to, up, with, via, per, vs
+    - Examples: "Gas Stove with 5 Burners", "Privacy Dividers for Classrooms", "Rectangular / Foldable Labels"
+    - Preserve brand casing exactly as provided in table; brand is not part of Product Name capitalization rules.
 - Attributes:
   * ONLY from rows where Tipo == "Atributo". Use the Contenido RAW, e.g., "5 Kg", not "Weight: 5 Kg".
   * NEVER use "use case" or any narrative text as attribute content.
