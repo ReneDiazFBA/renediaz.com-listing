@@ -304,6 +304,17 @@ def _get_cluster_tokens(rows: list) -> list:
     return out
 
 
+def _get_variation_dimensions(rows: list) -> list:
+    seen, dims = set(), []
+    for r in rows:
+        if (r.get("Tipo") or "").strip() == "Variación":
+            lab = (r.get("Etiqueta") or "").strip()
+            if lab and lab not in seen:
+                seen.add(lab)
+                dims.append(lab)
+    return dims
+
+
 def _has_any_token(text: str, tokens: list) -> bool:
     s = (text or "").lower()
     for t in tokens or []:
@@ -335,6 +346,8 @@ def _validate_bullets_payload(bmap: dict, variations_raw: list, rows: list, core
     attr_label_to_values = _get_attribute_label_to_values(
         rows)       # 'Material' -> {'Plastic',...}
     # ['classroom','student',...]
+    dims = _get_variation_dimensions(rows)
+    first_dim = _clean_header(dims[0]) if dims else ""
     cluster_tokens = _get_cluster_tokens(rows)
     sem_tokens = list(dict.fromkeys(
         (cluster_tokens or []) + (core_tokens or [])))
@@ -348,7 +361,7 @@ def _validate_bullets_payload(bmap: dict, variations_raw: list, rows: list, core
 
     def _in_len_range(b: str) -> bool:
         n = len(b or "")
-        return 180 <= n <= 240
+        return 150 <= n <= 180
 
     # Estructura base
     if "parent" not in bmap or not isinstance(bmap.get("parent"), list):
@@ -370,6 +383,10 @@ def _validate_bullets_payload(bmap: dict, variations_raw: list, rows: list, core
 
             # Header y cuerpo
             H, body = _split_header_body(b)
+            if scope == "parent" and i == 1 and first_dim:
+                if H != first_dim:
+                    return False, f"{scope}: bullet 1 header debe ser la etiqueta de variación '{first_dim}'"
+
             if not H or not body:
                 return False, f"{scope}: bullet {i} sin encabezado en MAYÚSCULA o sin cuerpo"
 
@@ -483,27 +500,15 @@ def run_listing_stage(inputs_df: pd.DataFrame, stage: str, cost_saver: bool = Tr
         return {"title": titles}
 
     elif stage == "bullets":
-        # Armar prompt con pares etiqueta/valor para cumplir SOP (IDEA = etiqueta; desarrollo = contenido)
         attrs_kv, vars_kv = _collect_kv_for_prompts(rows)
-
         up = prompt_bullets_json(
-            proj["head_phrases"],
-            proj["core_tokens"],
-            proj["attributes"],
-            proj["variations"],
-            proj["benefits"],
-            proj["emotions"],
-            proj["buyer_persona"],
-            proj["lexico"],
-            attributes_kv=attrs_kv,
-            variations_kv=vars_kv,
+            proj["head_phrases"], proj["core_tokens"], proj["attributes"], proj["variations"],
+            proj["benefits"], proj["emotions"], proj["buyer_persona"], proj["lexico"],
+            attributes_kv=attrs_kv, variations_kv=vars_kv,
         )
-
-        # Llamar IA + validar duro contra SOP + reintentos con causa
         bmap = _retry_bullets(
-            sys_user_prompt="",                 # no se usa, lo dejamos vacío
+            sys_user_prompt="",
             base_prompt=up,
-            # filas crudas de la tabla (Tipo/Etiqueta/Contenido)
             rows=rows,
             core_tokens=proj["core_tokens"],
             variations_raw=proj["variations"],
