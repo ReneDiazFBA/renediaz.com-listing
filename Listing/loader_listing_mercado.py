@@ -242,6 +242,7 @@ def construir_inputs_listing(resultados: dict,
         df.drop_duplicates(subset=[
                            "Tipo", "Contenido", "Etiqueta", "Fuente"], inplace=True, ignore_index=True)
         df.dropna(how="all", inplace=True)
+    st.session_state["inputs_para_listing"] = df    
     return df
 
 

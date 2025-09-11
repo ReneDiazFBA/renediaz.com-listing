@@ -75,6 +75,18 @@ def mostrar_listing_copywrite(excel_data=None):
     with st.expander("Ver inputs fuente (debug)", expanded=False):
         st.dataframe(df_inputs, use_container_width=True)
 
+    try:
+        cores = df_inputs["Etiqueta"].astype(
+            str).str.strip().str.lower().eq("core")
+        st.caption(f"Filas 'Core' detectadas: {int(cores.sum())}")
+        if int(cores.sum()) == 0:
+            st.error(
+                "No hay filas con Etiqueta == 'Core' en inputs_para_listing. El Product Name saldrá vacío.")
+    except Exception:
+        pass
+
+    st.divider()
+
     st.divider()
 
     # Controles globales

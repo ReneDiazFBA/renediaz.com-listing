@@ -285,10 +285,12 @@ def construir_inputs_listing(resultados: dict,
         # Core
         core_df = pd.DataFrame()
         if tier_col:
-            core_df = df_tmp[df_tmp[tier_col].astype(
-                str).str.contains(r"\bcore\b", case=False, na=False)]
+            tier_series = df_tmp[tier_col].astype(str).str.strip().str.lower()
+            core_df = df_tmp[tier_series.str.contains(r"\bcore\b", na=False)]
+        # Fallback: si no existe tier_origen o no encuentra 'core', promueve tokens únicos (no te deja sin Core)
         if core_df.empty:
             core_df = df_tmp.drop_duplicates(subset=[token_col]).head(50)
+
         seen = set()
         for t in core_df[token_col].astype(str):
             tok = t.strip()
