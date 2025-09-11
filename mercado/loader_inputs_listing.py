@@ -311,12 +311,17 @@ def construir_inputs_listing(resultados: dict,
                              "Etiqueta": etiqueta, "Fuente": "Keywords"})
 
     df = pd.DataFrame(
-        data, columns=["Tipo", "Contenido", "Etiqueta", "Fuente"])
+        data, columns=["Tipo", "Contenido", "Etiqueta", "Fuente"]
+    )
     if not df.empty:
         df.dropna(how="all", inplace=True)
         df = df[df["Contenido"].astype(str).str.strip() != ""]
         df.reset_index(drop=True, inplace=True)
+
+    st.session_state["inputs_para_listing"] = df.copy()
+
     return df
+
 
 # ----------------------------
 # Compat
