@@ -482,6 +482,35 @@ def run_listing_stage(inputs_df: pd.DataFrame, stage: str, cost_saver: bool = Tr
         titles = _coerce_titles_shape(j, proj["variations"])
         return {"title": titles}
 
+    elif stage == "bullets":
+        # Armar prompt con pares etiqueta/valor para cumplir SOP (IDEA = etiqueta; desarrollo = contenido)
+        attrs_kv, vars_kv = _collect_kv_for_prompts(rows)
+
+        up = prompt_bullets_json(
+            proj["head_phrases"],
+            proj["core_tokens"],
+            proj["attributes"],
+            proj["variations"],
+            proj["benefits"],
+            proj["emotions"],
+            proj["buyer_persona"],
+            proj["lexico"],
+            attributes_kv=attrs_kv,
+            variations_kv=vars_kv,
+        )
+
+        # Llamar IA + validar duro contra SOP + reintentos con causa
+        bmap = _retry_bullets(
+            sys_user_prompt="",                 # no se usa, lo dejamos vacío
+            base_prompt=up,
+            # filas crudas de la tabla (Tipo/Etiqueta/Contenido)
+            rows=rows,
+            core_tokens=proj["core_tokens"],
+            variations_raw=proj["variations"],
+            max_tries=3,
+        )
+        return {"bullets": bmap}
+
     elif stage == "description":
         up = prompt_description_json(
             proj["head_phrases"], proj["core_tokens"], proj["attributes"], proj["variations"],
