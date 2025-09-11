@@ -194,10 +194,67 @@ INSTRUCTIONS:
 - Output ONLY the JSON for the "title" key; no other keys, no prose, no markdown, no fences.
 """
 
-# ============================================================
-# Other stages — present but explicitly not implemented yet
-# (so imports don't break; no hidden placeholders)
-# ============================================================
+
+# ================================
+# BULLETS — General Brief (Amazon + Editorial + Fascination)
+# ================================
+BULLETS_GENERAL_BRIEF = r"""
+COPYWRITING GENERAL BULLETS GUIDELINES — CONTRACT LAYER
+(Integrates Amazon section rules + Editorial Brief + Fascination styles)
+
+AMAZON RULES
+- 5 bullets in "About this item".
+- Each one distinct, informative; no promotions, no competitors, no testimonials.
+- Fragments; no period at end. Numbers: 1–9 spelled, 10+ as digits.
+- Clean formatting; avoid HTML errors and symbol clutter.
+- The local SOP (RD) prevails if stricter.
+
+EDITORIAL RULES
+- Tone: professional, clear, confident; adapted to buyer persona.
+- Use the exact words from 'Léxico editorial' rows.
+- Avoid exaggerated claims; favor precise, verifiable language.
+
+FASCINATION STYLES
+- Curiosity / Hidden Benefit
+- Specificity / Proof
+- Objection → Resolution
+- Shortcut / Time-saver
+- Use-case Spotlight
+- Mini-mechanism
+Each bullet MUST embody one fascination style (deterministic, based on attribute/variation + persona).
+"""
+
+# ================================
+# BULLETS — SOP RD (STRICT)
+# ================================
+SOP_BULLETS_STRICT = r"""
+SOP RD — BULLETS (MANDATORY; overrides any conflicting guideline)
+
+FORMAT
+- IDEA in UPPERCASE (Etiqueta of Variación or Atributo).
+- ":" separator.
+- Development = Contenido + compatible semantic clusters; Core tokens ONLY if required for fluency (minimal).
+- No final period. Length = 150–180 characters (visible Unicode).
+
+COUNT & MAPPING
+- Always 5 bullets per scope (Parent and each Child variation).
+- Map variation dimensions by unique Etiqueta among Variación rows (first-appearance order):
+  · Bullet #1 = 1st dimension (Parent IDEA = ETIQUETA; Child IDEA = VARIATION VALUE).
+  · Bullet #2 = 2nd dimension, if exists (mismo criterio).
+  · Bullet #3 = 3rd dimension, if exists.
+- Remaining positions up to 5 → top-priority ATTRIBUTES (Beneficio > Ventaja > Obstáculo).
+- Never duplicate the same attribute across different bullets.
+
+SEMANTICS & SOURCING
+- Maximize compatible CLUSTER tokens without harming readability.
+- ALL content must come from table rows (Variación/Atributo/SEO semántico/Léxico). No inventions.
+- Buyer persona and Emotions inform prioritization/style; their text is never copied verbatim.
+
+STYLE & POLICY
+- English. Only the IDEA is all-caps; development in normal case.
+- No promotions, competitors, testimonials, or claims not supported by attributes.
+- SOP prevails wherever conflicts arise.
+"""
 
 
 def prompt_bullets_json(
@@ -209,9 +266,64 @@ def prompt_bullets_json(
     emotions: List[str],
     buyer_persona: str,
     lexico: str,
+    *,
+    # NUEVO: pares etiqueta/contenido para cumplir SOP (IDEA=Etiqueta; desarrollo=Contenido)
+    attributes_kv: List[dict],
+    variations_kv: List[dict],
 ) -> str:
-    raise NotImplementedError(
-        "Bullets SOP is not integrated yet. This function is intentionally not implemented to avoid hidden fallbacks.")
+    """
+    BULLETS prompt (SOP RD strict + general briefs).
+    Devuelve SOLO JSON con:
+    {
+      "bullets": {
+        "parent": ["b1..b5"],
+        "<var-slug>": ["b1..b5"]
+      }
+    }
+    """
+    return f"""{BULLETS_GENERAL_BRIEF}
+
+{SOP_BULLETS_STRICT}
+
+You are an Amazon listing copywriter executing a binding SOP. Use ONLY the inputs below (table projections). 
+If something is not present here, do NOT include it.
+
+AUTHORIZED INPUTS (structured):
+- BRAND (Marca; may be empty): {head_phrases}
+- SEO semantic tokens (Core + clusters): {core_tokens}
+- ATTRIBUTES (Atributo; label=Etiqueta, value=Contenido):
+  · flat values: {attributes}
+  · kv pairs   : {attributes_kv}
+- VARIATIONS (Variación; dimension=Etiqueta, value=Contenido):
+  · flat values: {variations}
+  · kv pairs   : {variations_kv}
+- Prioritization cues (never copied; ranking only): beneficios={benefits}, emociones={emotions}
+- Buyer persona (overview): {buyer_persona}
+- Editorial lexicon (actual words to use): {lexico}
+
+MANDATORY INSTRUCTIONS:
+- Generate exactly 5 bullets per scope (Parent and every variation child).
+- Determine variation DIMENSIONS by unique Etiqueta among Variación (first-appearance order).
+- Reserve b#1..b#K for K dimensions:
+  · Parent: IDEA = ETIQUETA (uppercase). Development = clusters compatibles + minimal core if needed.
+  · Child : IDEA = VARIATION VALUE (uppercase). Development idem.
+- Fill remaining slots up to 5 with top-priority ATTRIBUTES:
+  · IDEA = attribute ETIQUETA (uppercase).
+  · Development = attribute Contenido + compatible clusters; minimal core only if improves readability.
+- Each bullet must instantiate a Fascination style (deterministic to the attribute/variation + persona).
+- Length 150–180 characters; no final period; English; high readability; no invented tokens.
+- Return ONLY JSON with key "bullets". No prose, markdown, or fences.
+
+OUTPUT SHAPE (JSON ONLY):
+{{
+  "bullets": {{
+    "parent": ["b1","b2","b3","b4","b5"],
+    "<variation_slug_1>": ["b1","b2","b3","b4","b5"],
+    "<variation_slug_2>": ["b1","b2","b3","b4","b5"]
+  }}
+}}
+- Variation keys use slug of the variation VALUE (lowercase; strip punctuation; spaces→hyphens; collapse hyphens).
+"""
 
 
 def prompt_description_json(

@@ -133,6 +133,8 @@ def _collect(df_records):
     emotions = []
     buyer_list = []
     lexico_list = []
+    attributes_kv = []
+    variations_kv = []
 
     for r in df_records:
         tipo_raw = (r.get("Tipo") or "").strip()
@@ -152,8 +154,10 @@ def _collect(df_records):
         # Atributos / Variaciones
         elif tipo_raw == "Atributo":
             attributes.append(cont)
+            attributes_kv.append({"etiqueta": etiq_raw, "contenido": cont})
         elif tipo_raw == "Variación":
             variations.append(cont)
+            variations_kv.append({"etiqueta": etiq_raw, "contenido": cont})
 
         # Info para priorización (no se copia al título)
         elif tipo_raw == "Beneficio":
@@ -180,6 +184,8 @@ def _collect(df_records):
         "attributes":   _dedupe(attributes),
         "variations":   _dedupe(variations),
         "benefits":     _dedupe(benefits),
+        "attributes_kv": attributes_kv,
+        "variations_kv": variations_kv,
         "emotions":     _dedupe(emotions),
         "buyer_persona": buyer_persona,
         "lexico":        lexico,
@@ -284,8 +290,11 @@ def run_listing_stage(inputs_df: pd.DataFrame, stage: str, cost_saver: bool = Tr
     elif stage == "bullets":
         up = prompt_bullets_json(
             proj["head_phrases"], proj["core_tokens"], proj["attributes"], proj["variations"],
-            proj["benefits"], proj["emotions"], proj["buyer_persona"], proj["lexico"]
+            proj["benefits"], proj["emotions"], proj["buyer_persona"], proj["lexico"],
+            attributes_kv=proj["attributes_kv"],
+            variations_kv=proj["variations_kv"],
         )
+
         j = _chat_json(up)
         bullets = _coerce_bullets_shape(j, proj["variations"])
         return {"bullets": bullets}
