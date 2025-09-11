@@ -379,13 +379,16 @@ def _validate_bullets_payload(bmap: dict, variations_raw: list, rows: list, core
         for i, b in enumerate(items, 1):
             # Longitud
             if not _in_len_range(b):
-                return False, f"{scope}: bullet {i} fuera de 180–240 chars"
+                return False, f"{scope}: bullet {i} fuera de 150–180 chars"
 
             # Header y cuerpo
             H, body = _split_header_body(b)
             if scope == "parent" and i == 1 and first_dim:
                 if H != first_dim:
                     return False, f"{scope}: bullet 1 header debe ser la etiqueta de variación '{first_dim}'"
+                    # Desarrollo mínimo: no permitir texto demasiado corto o trivial
+            if len(body.split()) < 14:
+                return False, "parent: bullet 1 muy corto; desarrolla el concepto de la dimensión (fascination + clusters)"
 
             if not H or not body:
                 return False, f"{scope}: bullet {i} sin encabezado en MAYÚSCULA o sin cuerpo"
