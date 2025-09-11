@@ -89,7 +89,7 @@ DATA SOURCING (AUTHORIZED FIELDS ONLY — NO INVENTIONS)
 - Brand:
   * ONLY if there is a row with Tipo == "Marca". Use Contenido EXACTLY (no edits). If no brand row exists, do NOT invent or add any brand (no "Generic").
 - Product Name:
-  * EXCLUSIVELY from rows where Tipo == "SEO semántico" AND Etiqueta == "Core".
+  * EXCLUSIVELY from rows where Etiqueta == "Core" (regardless of Tipo).
   * You MAY insert minimal stopwords for readability, but semantic tokens MUST come from those Core rows.
   * CONSTRUCTION RULES (compose a readable noun phrase ONLY with the provided Core tokens):
     - Build a grammatical phrase using ONLY the Core tokens + minimal function words (articles/prepositions/determiners) required for fluency in English.
@@ -142,7 +142,7 @@ STYLE & POLICY (APPLY ALL; SOP overrides Amazon where stricter)
 - No disallowed symbols (! $ ? _ { } ^ ¬ ¦), no emojis, no URLs/contact, no time/price/shipping info.
 - No ALL CAPS for the whole line. Use Title Case (standard English); numerals for numbers; standard units/abbreviations; decimal/thousand separators consistent with the product niche.
 - Avoid keyword stuffing. Do not repeat the same content word more than 2× (articles/prepositions/conjunctions exempt).
-- Determinism & Traceability: same inputs → same outputs; every fragment must trace back to an authorized row (Marca / SEO Core / Atributo / Variación). No inventions.
+- Determinism & Traceability: same inputs → same outputs; every fragment must trace back to an authorized row (Marca / Core / Atributo / Variación). No inventions.
 
 REJECTION / EMPTY OUTPUT RULE
 - When a desktop/mobile field cannot satisfy MIN length using ONLY authorized content, output "" for that field.
@@ -172,7 +172,7 @@ If something is not present here, do NOT include it.
 
 AUTHORIZED INPUTS (table-derived projections):
 - BRAND candidates (from Tipo="Marca"; may be empty): {head_phrases}
-- SEO CORE tokens (Tipo="SEO semántico" & Etiqueta="Core"): {core_tokens}
+- SEO CORE tokens (Etiqueta="Core"): {core_tokens}
 - ATTRIBUTES (Tipo="Atributo" → Contenido RAW, exact): {attributes}
 - VARIATIONS (Tipo="Variación" → Contenido RAW, exact): {variations}
 

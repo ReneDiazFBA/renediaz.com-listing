@@ -11,7 +11,6 @@ import json
 import pandas as pd
 from typing import Optional
 
-
 # Prompts por etapa (títulos estrictos + placeholders para las otras)
 from listing.prompts_listing_copywrite import (
     prompt_titles_json,
@@ -87,7 +86,6 @@ def _chat_json(user_prompt: str) -> dict:
         temperature=_TEMPERATURE,
         max_tokens=_MAXTOK,
         messages=[
-            # Sistema minimalista: no agrega reglas ni reformas. El prompt ya contiene SOP/Brief/Inputs.
             {"role": "system", "content": "Return ONLY raw JSON. No prose, no markdown, no code fences."},
             {"role": "user",   "content": user_prompt},
         ],
@@ -116,16 +114,16 @@ def _to_records(df: pd.DataFrame, budgeted: bool = True):
 
 def _collect(df_records):
     """
-    PROYECCIÓN ESTRICTA A SOP:
-      - head_phrases: 'Marca' y 'Nombre sugerido' (tal cual tabla).
-      - core_tokens : SOLO filas con Tipo == 'SEO semántico' (con tilde) Y Etiqueta == 'Core' (con C mayúscula en la tabla).
+    PROYECCIÓN ESTRICTA A SOP (actualizada):
+      - head_phrases: SOLO 'Marca' (tal cual tabla).
+      - core_tokens : SOLO filas con Etiqueta == 'Core' (independiente del Tipo).
       - attributes  : SOLO Tipo == 'Atributo' → Contenido (RAW).
       - variations  : SOLO Tipo == 'Variación' → Contenido (RAW).
-      - benefits    : SOLO Tipo == 'Beneficio' → Contenido.
-      - emotions    : SOLO Tipo == 'Emoción' → Contenido.
+      - benefits    : SOLO Tipo == 'Beneficio' → Contenido (priorización; NO se copia al título).
+      - emotions    : SOLO Tipo == 'Emoción' → Contenido (priorización; NO se copia al título).
       - buyer_persona: SOLO Tipo == 'Buyer persona' → concatenado.
       - lexico      : SOLO Tipo == 'Léxico editorial' → concatenado.
-    NO se aceptan sinónimos ni variantes fuera de SOP.
+    NO se aceptan fuentes fuera de SOP.
     """
     head_phrases = []
     core_tokens = []
@@ -143,35 +141,31 @@ def _collect(df_records):
         if not cont:
             continue
 
-        # ESTRICTO a SOP: comparar exacto contra los literales de tu tabla
+        # Marca
         if tipo_raw == "Marca":
             head_phrases.append(cont)
 
-        elif tipo_raw == "Nombre sugerido":
-            pass
-
-        elif tipo_raw == "SEO semántico" and etiq_raw == "Core":
+        # CORE (solo por Etiqueta == "Core", sin depender del Tipo)
+        elif etiq_raw == "Core":
             core_tokens.append(cont)
 
+        # Atributos / Variaciones
         elif tipo_raw == "Atributo":
             attributes.append(cont)
-
         elif tipo_raw == "Variación":
             variations.append(cont)
 
+        # Info para priorización (no se copia al título)
         elif tipo_raw == "Beneficio":
             benefits.append(cont)
-
         elif tipo_raw == "Emoción":
             emotions.append(cont)
 
+        # Metadatos editoriales
         elif tipo_raw == "Buyer persona":
             buyer_list.append(cont)
-
         elif tipo_raw == "Léxico editorial":
             lexico_list.append(cont)
-
-        # Todo lo que NO esté en SOP se ignora deliberadamente.
 
     # dedupe conservando orden
     def _dedupe(seq):
@@ -190,7 +184,6 @@ def _collect(df_records):
         "buyer_persona": buyer_persona,
         "lexico":        lexico,
     }
-
 
 # -------------------------- Variations (slug) --------------------------
 
@@ -303,7 +296,6 @@ def run_listing_stage(inputs_df: pd.DataFrame, stage: str, cost_saver: bool = Tr
             proj["benefits"], proj["emotions"], proj["buyer_persona"], proj["lexico"]
         )
         j = _chat_json(up)
-        # j puede ser {"description": "..."} o anidado
         desc = j.get("description") if isinstance(j, dict) else ""
         if desc is None:
             desc = ""

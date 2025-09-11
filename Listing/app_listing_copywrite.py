@@ -44,7 +44,6 @@ def _export_buttons(draft: dict):
         )
     with col2:
         backend = ""
-        # permite exportar backend si existe en el draft
         if isinstance(draft.get("search_terms"), str):
             backend = draft.get("search_terms") or ""
         st.download_button(
@@ -65,12 +64,11 @@ def mostrar_listing_copywrite(excel_data=None):
 
     if df_inputs.empty:
         st.warning(
-            "No hay inputs disponibles. Ve a **Mercado → Cliente / Tabla** para construir 'inputs_para_listing'."
-        )
+            "No hay inputs disponibles. Ve a **Mercado → Cliente / Tabla** para construir 'inputs_para_listing'.")
         with st.expander("¿Qué debería ver aquí?", expanded=False):
             st.markdown(
-                "- Filas como **Nombre sugerido**, **Descripción breve**, **Beneficio**, **Atributo**, **Variación**, "
-                "**Emoción**, **Buyer persona**, **Léxico editorial**, y **Token Semántico (SEO Core)**."
+                "- Filas como **Marca**, **SEO semántico/Core**, **Atributo**, **Variación**, "
+                "**Beneficio**, **Emoción**, **Buyer persona**, **Léxico editorial**."
             )
         return
 
@@ -85,8 +83,8 @@ def mostrar_listing_copywrite(excel_data=None):
         use_ai = st.toggle("Use AI (cheap)", value=True,
                            help="IA económica (gpt-4o-mini) si hay OPENAI_API_KEY.")
     with c2:
-        cost_saver = st.toggle("Cost saver", value=True,
-                               help="Recorta filas por tipo para abaratar pruebas (no cambia semántica).")
+        cost_saver = st.toggle(
+            "Cost saver", value=True, help="Recorta filas por tipo para abaratar pruebas (no cambia semántica).")
 
     if "draft_listing" not in st.session_state:
         st.session_state["draft_listing"] = {}
