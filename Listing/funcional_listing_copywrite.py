@@ -435,6 +435,27 @@ def _retry_bullets(sys_user_prompt: str, base_prompt: str, rows: list, core_toke
     return bmap
 
 
+def _collect_kv_for_prompts(rows: list):
+    """
+    Convierte filas de la tabla en pares label/value para el prompt de Bullets.
+    - Atributo  -> {"label": Etiqueta, "value": Contenido}
+    - Variación -> {"label": Etiqueta, "value": Contenido}
+    Mantiene el orden de aparición y evita pares vacíos.
+    """
+    attrs_kv, vars_kv = [], []
+    for r in rows:
+        tipo = (r.get("Tipo") or "").strip()
+        lab = (r.get("Etiqueta") or "").strip()
+        val = (r.get("Contenido") or "").strip()
+        if not lab or not val:
+            continue
+        if tipo == "Atributo":
+            attrs_kv.append({"label": lab, "value": val})
+        elif tipo == "Variación":
+            vars_kv.append({"label": lab, "value": val})
+    return attrs_kv, vars_kv
+
+
 # -------------------------- Ejecución por ETAPA --------------------------
 
 def run_listing_stage(inputs_df: pd.DataFrame, stage: str, cost_saver: bool = True, rules: Optional[dict] = None):
@@ -457,22 +478,6 @@ def run_listing_stage(inputs_df: pd.DataFrame, stage: str, cost_saver: bool = Tr
         j = _chat_json(up)
         titles = _coerce_titles_shape(j, proj["variations"])
         return {"title": titles}
-
-    elif stage == "bullets":
-        up = prompt_bullets_json(
-            proj["head_phrases"], proj["core_tokens"], proj["attributes"], proj["variations"],
-            proj["benefits"], proj["emotions"], proj["buyer_persona"], proj["lexico"]
-        )
-        # Validación + reintento con reglas SOP
-        bullets = _retry_bullets(
-            sys_user_prompt="",                 # tu _chat_json ya fija el system
-            base_prompt=up,
-            rows=rows,
-            core_tokens=proj["core_tokens"],
-            variations_raw=proj["variations"],
-            max_tries=3
-        )
-        return {"bullets": bullets}
 
     elif stage == "description":
         up = prompt_description_json(
