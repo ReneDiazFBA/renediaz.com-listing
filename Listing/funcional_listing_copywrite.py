@@ -434,29 +434,30 @@ def _retry_bullets(sys_user_prompt: str, base_prompt: str, rows: list, core_toke
     # Devuelve lo último aunque falle, para diagnóstico en UI
     return bmap
 
+    # -------------------------- NUEVO helper para prompt de Bullets --------------------------
 
-def _collect_kv_for_prompts(rows: list):
-    """
-    Convierte filas de la tabla en pares label/value para el prompt de Bullets.
-    - Atributo  -> {"label": Etiqueta, "value": Contenido}
-    - Variación -> {"label": Etiqueta, "value": Contenido}
-    Mantiene el orden de aparición y evita pares vacíos.
-    """
-    attrs_kv, vars_kv = [], []
-    for r in rows:
-        tipo = (r.get("Tipo") or "").strip()
-        lab = (r.get("Etiqueta") or "").strip()
-        val = (r.get("Contenido") or "").strip()
-        if not lab or not val:
-            continue
-        if tipo == "Atributo":
-            attrs_kv.append({"label": lab, "value": val})
-        elif tipo == "Variación":
-            vars_kv.append({"label": lab, "value": val})
-    return attrs_kv, vars_kv
-
+    def _collect_kv_for_prompts(rows: list):
+        """
+        Convierte filas de la tabla en pares label/value para el prompt de Bullets.
+        - Atributo  -> {"label": Etiqueta, "value": Contenido}
+        - Variación -> {"label": Etiqueta, "value": Contenido}
+        Mantiene el orden de aparición y evita pares vacíos.
+        """
+        attrs_kv, vars_kv = [], []
+        for r in rows:
+            tipo = (r.get("Tipo") or "").strip()
+            lab = (r.get("Etiqueta") or "").strip()
+            val = (r.get("Contenido") or "").strip()
+            if not lab or not val:
+                continue
+            if tipo == "Atributo":
+                attrs_kv.append({"label": lab, "value": val})
+            elif tipo == "Variación":
+                vars_kv.append({"label": lab, "value": val})
+        return attrs_kv, vars_kv
 
 # -------------------------- Ejecución por ETAPA --------------------------
+
 
 def run_listing_stage(inputs_df: pd.DataFrame, stage: str, cost_saver: bool = True, rules: Optional[dict] = None):
     """
