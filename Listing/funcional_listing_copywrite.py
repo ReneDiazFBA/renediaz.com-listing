@@ -263,8 +263,179 @@ def _coerce_bullets_shape(j_bul: dict, variations_raw: list) -> dict:
             out[vk] = _five([])
     return out
 
-# -------------------------- Ejecución por ETAPA --------------------------
+# -------------------------- Bullets: helpers de contexto --------------------------
 
+
+def _get_variation_label_map(rows: list) -> dict:
+    """ value (Contenido) -> label (Etiqueta), p.ej. 'Green' -> 'Color' """
+    m = {}
+    for r in rows:
+        if (r.get("Tipo") or "").strip() == "Variación":
+            val = (r.get("Contenido") or "").strip()
+            lab = (r.get("Etiqueta") or "").strip()
+            if val:
+                m[val] = lab
+    return m
+
+
+def _get_attribute_label_to_values(rows: list) -> dict:
+    """ label -> set(values)  p.ej. 'Material' -> {'Plastic', ...} """
+    m = {}
+    for r in rows:
+        if (r.get("Tipo") or "").strip() == "Atributo":
+            lab = (r.get("Etiqueta") or "").strip()
+            val = (r.get("Contenido") or "").strip()
+            if lab and val:
+                m.setdefault(lab, set()).add(val)
+    return m
+
+
+def _get_cluster_tokens(rows: list) -> list:
+    """ Todos los SEO semántico donde Etiqueta empieza por 'Cluster' (sin duplicar) """
+    seen, out = set(), []
+    for r in rows:
+        if (r.get("Tipo") or "").strip() == "SEO semántico":
+            et = (r.get("Etiqueta") or "").strip()
+            if et.lower().startswith("cluster"):
+                tok = (r.get("Contenido") or "").strip()
+                if tok and tok not in seen:
+                    seen.add(tok)
+                    out.append(tok)
+    return out
+
+
+def _has_any_token(text: str, tokens: list) -> bool:
+    s = (text or "").lower()
+    for t in tokens or []:
+        if t and str(t).lower() in s:
+            return True
+    return False
+
+
+def _clean_header(h: str) -> str:
+    return (h or "").strip().upper()
+
+# -------------------------- Bullets: validadores duros (SOP) --------------------------
+
+
+def _validate_bullets_payload(bmap: dict, variations_raw: list, rows: list, core_tokens: list) -> (bool, str):
+    """
+    Reglas:
+      - Debe existir "parent" y cada variación (slug) con 5 bullets.
+      - Encabezado: IDEA en MAYÚSCULA + ':' + desarrollo.
+      - Bullet 1: por variación (header = etiqueta de la variación, p.ej. 'COLOR'), y el cuerpo NO es sólo el valor; debe desarrollar concepto.
+      - Bullets 2–5: headers deben ser etiquetas de Atributo (Material/Includes/Dimensions/Weight/Shape/...) y
+        el cuerpo NO puede ser sólo repetir el contenido del atributo; debe desarrollar en estilo fascination.
+      - Longitud: 180–240 chars (cada bullet).
+      - Deben incluir tokens de cluster siempre que no rompan la legibilidad (al menos 1 token cluster o core en cada bullet).
+    """
+    # Mapas desde la tabla
+    var_value_to_label = _get_variation_label_map(
+        rows)               # 'Green' -> 'Color'
+    attr_label_to_values = _get_attribute_label_to_values(
+        rows)       # 'Material' -> {'Plastic',...}
+    # ['classroom','student',...]
+    cluster_tokens = _get_cluster_tokens(rows)
+    sem_tokens = list(dict.fromkeys(
+        (cluster_tokens or []) + (core_tokens or [])))
+
+    # Helpers locales
+    def _split_header_body(b: str):
+        if ":" not in b:
+            return "", b.strip()
+        idx = b.find(":")
+        return _clean_header(b[:idx]), b[idx+1:].strip()
+
+    def _in_len_range(b: str) -> bool:
+        n = len(b or "")
+        return 180 <= n <= 240
+
+    # Estructura base
+    if "parent" not in bmap or not isinstance(bmap.get("parent"), list):
+        return False, "Bullets: falta 'parent' o no es lista"
+    for vk in variations_raw:
+        slug = _slugify_variation_value(vk)
+        if slug not in bmap or not isinstance(bmap.get(slug), list):
+            return False, f"Bullets: falta variación '{slug}' o no es lista"
+
+    # Chequear cada scope
+    for scope, items in bmap.items():
+        if not isinstance(items, list) or len(items) != 5:
+            return False, f"{scope}: deben ser 5 bullets"
+
+        for i, b in enumerate(items, 1):
+            # Longitud
+            if not _in_len_range(b):
+                return False, f"{scope}: bullet {i} fuera de 180–240 chars"
+
+            # Header y cuerpo
+            H, body = _split_header_body(b)
+            if not H or not body:
+                return False, f"{scope}: bullet {i} sin encabezado en MAYÚSCULA o sin cuerpo"
+
+            # Debe incluir algún token semántico (cluster/core) para enriquecer
+            if not _has_any_token(b, sem_tokens):
+                return False, f"{scope}: bullet {i} sin tokens de cluster/core"
+
+            # Reglas específicas
+            if scope != "parent" and i == 1:
+                # Bullet 1 por variación
+                # Recuperar valor de variación real desde el slug
+                # Buscamos cuál raw produce ese slug
+                var_value = None
+                for raw in variations_raw:
+                    if _slugify_variation_value(raw) == scope:
+                        var_value = raw
+                        break
+                var_label = (var_value_to_label.get(
+                    var_value, "") or "").strip()
+                if not var_label:
+                    return False, f"{scope}: no encuentro etiqueta de variación para bullet 1"
+
+                if H != _clean_header(var_label):
+                    return False, f"{scope}: bullet 1 header debe ser etiqueta de variación '{var_label.upper()}'"
+
+                # Cuerpo no puede ser sólo el valor literal ni frase trivial
+                if (var_value or "").lower() in body.lower() and len(body.split()) < 10:
+                    return False, f"{scope}: bullet 1 muy literal, desarrolla el concepto (fascination)"
+
+            if i >= 2:
+                # Bullets 2–5: deben corresponder a etiquetas de Atributo
+                if H not in [_clean_header(k) for k in attr_label_to_values.keys()]:
+                    return False, f"{scope}: bullet {i} header '{H}' no es una etiqueta de Atributo válida"
+
+                # Evitar que el cuerpo sea solo repetir el contenido del atributo
+                vals = set()
+                for lab, vs in attr_label_to_values.items():
+                    if _clean_header(lab) == H:
+                        vals |= vs
+                for v in vals:
+                    if v and v.lower() == body.lower():
+                        return False, f"{scope}: bullet {i} cuerpo repite exactamente el contenido del atributo"
+
+    return True, ""
+
+
+def _retry_bullets(sys_user_prompt: str, base_prompt: str, rows: list, core_tokens: list, variations_raw: list, max_tries=3):
+    """
+    Llama a IA, valida contra SOP y reintenta explicando el fallo.
+    """
+    last_err = ""
+    for attempt in range(1, max_tries + 1):
+        j = _chat_json(base_prompt if attempt ==
+                       1 else f"{base_prompt}\n\nNOTE: Previous output failed because: {last_err}. Fix and return JSON again.")
+        # Normaliza forma { "bullets": { ... } }
+        bmap = _coerce_bullets_shape(j, variations_raw)
+        ok, msg = _validate_bullets_payload(
+            bmap, variations_raw, rows, core_tokens)
+        if ok:
+            return bmap
+        last_err = msg or "invalid"
+    # Devuelve lo último aunque falle, para diagnóstico en UI
+    return bmap
+
+
+# -------------------------- Ejecución por ETAPA --------------------------
 
 def run_listing_stage(inputs_df: pd.DataFrame, stage: str, cost_saver: bool = True, rules: Optional[dict] = None):
     """
@@ -290,13 +461,17 @@ def run_listing_stage(inputs_df: pd.DataFrame, stage: str, cost_saver: bool = Tr
     elif stage == "bullets":
         up = prompt_bullets_json(
             proj["head_phrases"], proj["core_tokens"], proj["attributes"], proj["variations"],
-            proj["benefits"], proj["emotions"], proj["buyer_persona"], proj["lexico"],
-            attributes_kv=proj["attributes_kv"],
-            variations_kv=proj["variations_kv"],
+            proj["benefits"], proj["emotions"], proj["buyer_persona"], proj["lexico"]
         )
-
-        j = _chat_json(up)
-        bullets = _coerce_bullets_shape(j, proj["variations"])
+        # Validación + reintento con reglas SOP
+        bullets = _retry_bullets(
+            sys_user_prompt="",                 # tu _chat_json ya fija el system
+            base_prompt=up,
+            rows=rows,
+            core_tokens=proj["core_tokens"],
+            variations_raw=proj["variations"],
+            max_tries=3
+        )
         return {"bullets": bullets}
 
     elif stage == "description":
