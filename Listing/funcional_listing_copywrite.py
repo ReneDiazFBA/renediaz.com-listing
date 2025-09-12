@@ -326,6 +326,96 @@ def _has_any_token(text: str, tokens: list) -> bool:
 def _clean_header(h: str) -> str:
     return (h or "").strip().upper()
 
+# --- Helpers de longitud para bullets (no toques headers) ---
+
+
+def _split_header_body_text(b: str):
+    b = (b or "").strip()
+    if ":" not in b:
+        return "", b
+    i = b.find(":")
+    header = b[:i].strip()
+    body = b[i+1:].strip()
+    return header, body
+
+
+def _rebuild_bullet(header: str, body: str) -> str:
+    header = (header or "").strip()
+    body = (body or "").strip()
+    # sin punto final; limpia separadores colgantes
+    body = re.sub(r"[\.]+$", "", body)
+    body = re.sub(r"[\s,;:\-–—]+$", "", body)
+    return f"{header}: {body}".strip()
+
+
+def _trim_to_max(b: str, max_len: int) -> str:
+    header, body = _split_header_body_text(b)
+    # espacio para "HEADER: " (incluye dos caracteres ': ' si hay header)
+    base = f"{header}: " if header else ""
+    room = max_len - len(base)
+    txt = body[:room]
+    # no cortar palabras
+    if len(body) > room:
+        cut = txt.rfind(" ")
+        if cut > 0:
+            txt = txt[:cut]
+    return _rebuild_bullet(header, txt)
+
+
+def _pad_to_min(b: str, min_len: int, max_len: int, sem_tokens: list) -> str:
+    """Rellena con tokens (cluster/core) que aún no aparecen. No inventa texto."""
+    used = (b or "").lower()
+    header, body = _split_header_body_text(b)
+
+    # tokens candidatos que no están presentes
+    cand = [t for t in (sem_tokens or []) if t and t.lower() not in used]
+    # separador corto neutro
+    sep = " — "
+
+    while len(b) < min_len and cand:
+        add = cand.pop(0)
+        proposal = _rebuild_bullet(
+            header, (body + (sep if body else "") + add).strip())
+        if len(proposal) > max_len:
+            break
+        b = proposal
+        header, body = _split_header_body_text(b)
+
+    return b
+
+
+def _enforce_bullets_length(bmap: dict, rows: list, core_tokens: list,
+                            min_len: int = 150, max_len: int = 180) -> dict:
+    """Ajusta cada bullet al rango [min_len, max_len] sin tocar el header."""
+    cluster_tokens = _get_cluster_tokens(rows)
+    sem_tokens = list(dict.fromkeys(
+        (cluster_tokens or []) + (core_tokens or [])))
+
+    out = {}
+    for scope, items in bmap.items():
+        if not isinstance(items, list):
+            out[scope] = items
+            continue
+        fixed = []
+        for b in items:
+            b = (b or "").strip()
+            if not b:
+                fixed.append(b)
+                continue
+            # recorta si se pasa
+            if len(b) > max_len:
+                b = _trim_to_max(b, max_len)
+            # rellena si falta
+            if len(b) < min_len:
+                b = _pad_to_min(b, min_len, max_len, sem_tokens)
+            # limpieza final: sin punto al final
+            h, body = _split_header_body_text(b)
+            b = _rebuild_bullet(h, body)
+            fixed.append(b)
+        out[scope] = fixed
+    return out
+
+
 # -------------------------- Bullets: validadores duros (SOP) --------------------------
 
 
