@@ -437,22 +437,23 @@ def _validate_bullets_payload(bmap: dict, variations_raw: list, rows: list, core
 
 
 def _retry_bullets(sys_user_prompt: str, base_prompt: str, rows: list, core_tokens: list, variations_raw: list, max_tries=3):
-    """
-    Llama a IA, valida contra SOP y reintenta explicando el fallo.
-    """
     last_err = ""
+    last_bmap = None
     for attempt in range(1, max_tries + 1):
-        j = _chat_json(base_prompt if attempt ==
-                       1 else f"{base_prompt}\n\nNOTE: Previous output failed because: {last_err}. Fix and return JSON again.")
-        # Normaliza forma { "bullets": { ... } }
+        note = "" if attempt == 1 else f"\n\nHARD FIX: Previous output failed because: {last_err}. " \
+                                       f"Repair ONLY the violated rules and return JSON again."
+        j = _chat_json(base_prompt + note)
         bmap = _coerce_bullets_shape(j, variations_raw)
         ok, msg = _validate_bullets_payload(
             bmap, variations_raw, rows, core_tokens)
         if ok:
             return bmap
         last_err = msg or "invalid"
-    # Devuelve lo último aunque falle, para diagnóstico en UI
-    return bmap
+        last_bmap = bmap
+
+    # 👇 en vez de devolver lo inválido
+    raise ValueError(
+        f"Bullets inválidos tras {max_tries} intentos: {last_err}")
 
     # -------------------------- NUEVO helper para prompt de Bullets --------------------------
 

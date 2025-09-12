@@ -313,6 +313,10 @@ MANDATORY INSTRUCTIONS:
 - Each bullet must instantiate a Fascination style (deterministic to the attribute/variation + persona).
 - Length 150–180 characters; no final period; English; high readability; no invented tokens.
 - Return ONLY JSON with key "bullets". No prose, markdown, or fences.
+HARD CONSTRAINTS (non-negotiable):
+- If there is at least one variation dimension, PARENT bullet #1 HEADER must be exactly the first variation label in uppercase (e.g., "COLOR:").
+- CHILD bullet #1 HEADER must be the variation's label (uppercase) that corresponds to that child.
+- Do not use any attribute label in PARENT bullet #1.
 
 OUTPUT SHAPE (JSON ONLY):
 {{
